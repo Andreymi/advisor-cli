@@ -9,6 +9,7 @@ MCP Server для получения "второго мнения" от альт
 from typing import Optional
 from enum import Enum
 import asyncio
+import hashlib
 import os
 import json
 from pathlib import Path
@@ -36,16 +37,47 @@ mcp = FastMCP("advisor_mcp")
 # ===== Логирование =====
 litellm.set_verbose = os.getenv("ADVISOR_VERBOSE", "false").lower() == "true"
 
+# ===== Роль эксперта =====
+DEFAULT_ROLE = os.getenv(
+    "ADVISOR_DEFAULT_ROLE",
+    "Ты опытный технический консультант. Твоя задача — дать критическую оценку, найти ошибки или предложить лучшее решение."
+)
+
+
+def _hash_prompt(text: str) -> str:
+    """Генерирует короткий хэш для инвалидации кэша при смене промпта."""
+    return hashlib.sha256(text.encode()).hexdigest()[:8]
+
+
+# Версия кэша — автоматически меняется при изменении DEFAULT_ROLE
+PROMPT_VERSION = _hash_prompt(DEFAULT_ROLE)
+
 # ===== Кэширование =====
 CACHE_ENABLED = os.getenv("ADVISOR_CACHE_ENABLED", "true").lower() == "true"
 CACHE_TTL = int(os.getenv("ADVISOR_CACHE_TTL", "3600"))
+CACHE_DIR = _project_root / ".mcp_cache"
 
-if CACHE_ENABLED:
-    redis_url = os.getenv("REDIS_URL")
-    if redis_url:
-        litellm.cache = Cache(type="redis", url=redis_url, ttl=CACHE_TTL)
-    else:
-        litellm.cache = Cache(type="local", ttl=CACHE_TTL)
+
+def _init_cache() -> bool:
+    """Инициализация кэша с graceful degradation."""
+    if not CACHE_ENABLED:
+        return False
+
+    try:
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            litellm.cache = Cache(type="redis", url=redis_url, ttl=CACHE_TTL)
+        else:
+            # Disk cache — персистентный, переживает перезапуски
+            CACHE_DIR.mkdir(exist_ok=True)
+            litellm.cache = Cache(type="disk", disk_cache_dir=str(CACHE_DIR), ttl=CACHE_TTL)
+        return True
+    except Exception as e:
+        print(f"[advisor_mcp] Cache init failed: {e}. Continuing without cache.")
+        return False
+
+
+CACHE_ACTIVE = _init_cache()
 
 # ===== Конфигурация провайдеров =====
 # Провайдер включён только если указан API ключ в .env
@@ -83,12 +115,7 @@ OLLAMA_CLOUD_BASE = os.getenv("OLLAMA_CLOUD_BASE_URL", "https://ollama.com/v1")
 # Список включённых провайдеров
 ENABLED_PROVIDERS = [name for name, cfg in PROVIDERS.items() if cfg["enabled"]]
 
-# ===== Константы =====
-DEFAULT_ROLE = os.getenv(
-    "ADVISOR_DEFAULT_ROLE",
-    "Ты опытный технический консультант. Твоя задача — дать критическую оценку, найти ошибки или предложить лучшее решение."
-)
-# Модели по умолчанию (недорогие и актуальные)
+# ===== Модели по умолчанию =====
 # gemini/gemini-2.0-flash, openai/gpt-4o-mini, ollama-cloud/gpt-oss:120b-cloud
 DEFAULT_MODEL = os.getenv("ADVISOR_DEFAULT_MODEL", "gemini/gemini-2.0-flash")
 DEFAULT_MODELS_COMPARE = os.getenv("ADVISOR_DEFAULT_MODELS_COMPARE", "gemini/gemini-2.0-flash,openai/gpt-4o-mini")
@@ -263,7 +290,8 @@ async def advisor_consult_expert(params: ConsultExpertInput) -> str:
 
     try:
         kwargs = _get_completion_kwargs(params.model)
-        response = await acompletion(messages=messages, caching=CACHE_ENABLED, **kwargs)
+        kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
+        response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
         answer = response.choices[0].message.content
 
         if params.response_format == ResponseFormat.JSON:
@@ -333,7 +361,8 @@ async def advisor_compare_experts(params: CompareExpertsInput) -> str:
 
         try:
             kwargs = _get_completion_kwargs(model)
-            response = await acompletion(messages=messages, caching=CACHE_ENABLED, **kwargs)
+            kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
+            response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
             return model, response.choices[0].message.content, False
         except Exception as e:
             return model, _format_error(e), True

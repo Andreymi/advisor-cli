@@ -8,6 +8,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
+  - Bash(mgrep:*)
   - mcp__advisor_mcp__.*
 ---
 
@@ -17,7 +18,11 @@ Get alternative perspectives from other LLMs.
 
 ## Workflow
 
-1. If question about code → **read it first** with Read/Glob/Grep
+1. If question about code → **find and read it first**:
+   - `mgrep "query"` — semantic search (fast, by meaning)
+   - `Grep` — exact text match
+   - `Glob` — find by file pattern
+   - `Read` — read specific file
 2. Call tool:
    - **One opinion** → `advisor_consult_expert(query, context)`
    - **Compare opinions** → `advisor_compare_experts(query, context)`
