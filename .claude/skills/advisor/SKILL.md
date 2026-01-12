@@ -35,6 +35,23 @@ Get alternative perspectives from other LLMs.
 - `context` = код или данные для анализа
 - Highlight consensus and disagreements between experts
 
+## Expert Role Selection
+
+**Set `role` parameter based on task type** — specialized roles give deeper answers:
+
+| Task | Role |
+|------|------|
+| Security review | "Ты Senior Security Engineer. Найди уязвимости." |
+| Code review | "Ты Staff Engineer. Оцени качество кода." |
+| Architecture | "Ты Solution Architect. Оцени масштабируемость." |
+| Performance | "Ты Performance Engineer. Найди узкие места." |
+| API design | "Ты API Designer. Оцени удобство и консистентность." |
+| Testing | "Ты QA Lead. Предложи тест-кейсы." |
+| Database | "Ты DBA. Оцени схему и запросы." |
+| DevOps | "Ты DevOps Engineer. Оцени CI/CD и инфраструктуру." |
+
+Example: `advisor_consult_expert(query="...", context="...", role="Ты Senior Security Engineer...")`
+
 ---
 
 ## For parent agent (after fork completes)
