@@ -179,6 +179,185 @@ def _format_error(e: Exception) -> str:
     return f"Ошибка: {error_msg}"
 
 
+# Бюджет токенов для thinking по уровням
+THINKING_BUDGETS = {
+    "low": 1024,
+    "medium": 4096,
+    "high": 16000,
+}
+
+# ===== Справочник reasoning моделей =====
+# Формат: паттерн в имени модели -> тип параметра ("thinking" или "reasoning_effort")
+KNOWN_REASONING_MODELS = {
+    # DeepSeek семейство
+    "deepseek-r1": "thinking",
+    "deepseek-v3": "thinking",
+    # Kimi
+    "kimi-k2-thinking": "thinking",
+    "kimi-k2": "thinking",
+    # MiniMax
+    "minimax-m2": "thinking",
+    # Qwen QwQ
+    "qwq": "thinking",
+    # OpenAI reasoning
+    "o1-": "reasoning_effort",
+    "o3-": "reasoning_effort",
+    # Общие паттерны
+    "thinking": "thinking",
+    "reasoner": "thinking",
+}
+
+# Disk cache для автообнаруженных моделей
+REASONING_CACHE_FILE = CACHE_DIR / "reasoning_models.json"
+_reasoning_cache: dict[str, Optional[str]] = {}  # model -> type или None
+
+
+def _load_reasoning_cache() -> dict[str, Optional[str]]:
+    """Загружает кэш автообнаруженных reasoning моделей."""
+    try:
+        if REASONING_CACHE_FILE.exists():
+            with open(REASONING_CACHE_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_reasoning_cache():
+    """Сохраняет кэш автообнаруженных reasoning моделей."""
+    try:
+        CACHE_DIR.mkdir(exist_ok=True)
+        with open(REASONING_CACHE_FILE, 'w') as f:
+            json.dump(_reasoning_cache, f, indent=2)
+    except Exception:
+        pass
+
+
+# Загружаем кэш при старте
+_reasoning_cache = _load_reasoning_cache()
+
+
+def _get_reasoning_type_from_registry(model: str) -> Optional[str]:
+    """Ищет тип reasoning в справочнике по паттернам в имени модели."""
+    model_lower = model.lower()
+    for pattern, reasoning_type in KNOWN_REASONING_MODELS.items():
+        if pattern in model_lower:
+            return reasoning_type
+    return None
+
+
+def _is_model_cached(model: str) -> bool:
+    """Проверяет, есть ли модель в кэше (независимо от значения)."""
+    return model in _reasoning_cache
+
+
+def _get_reasoning_type(model: str) -> Optional[str]:
+    """
+    Определяет тип reasoning для модели.
+    Приоритет: провайдер -> disk cache -> справочник -> None
+    """
+    provider = _get_provider(model)
+
+    # 1. По провайдеру (точное знание)
+    if provider in ("anthropic", "gemini", "vertex_ai"):
+        return "thinking"
+    if provider in ("openai", "xai"):
+        return "reasoning_effort"
+
+    # 2. Из disk cache (автообнаруженные ранее)
+    if model in _reasoning_cache:
+        return _reasoning_cache[model]
+
+    # 3. Из справочника (по паттернам в имени)
+    return _get_reasoning_type_from_registry(model)
+
+
+def _cache_reasoning_type(model: str, reasoning_type: Optional[str]):
+    """Сохраняет тип reasoning модели в кэш."""
+    if model not in _reasoning_cache:
+        _reasoning_cache[model] = reasoning_type
+        _save_reasoning_cache()
+
+
+def _get_reasoning_kwargs(model: str, reasoning: Optional[str]) -> dict:
+    """Конвертирует уровень reasoning в параметры для конкретной модели."""
+    if not reasoning:
+        return {}
+
+    reasoning_type = _get_reasoning_type(model)
+    budget = THINKING_BUDGETS.get(reasoning, 4096)
+
+    if reasoning_type == "thinking":
+        return {"thinking": {"type": "enabled", "budget_tokens": budget}}
+    elif reasoning_type == "reasoning_effort":
+        return {"reasoning_effort": reasoning}
+    elif _is_model_cached(model):
+        # Модель в кэше с None — точно не поддерживает reasoning
+        return {}
+
+    # Неизвестная модель — пробуем thinking (автообнаружение по ответу)
+    return {"thinking": {"type": "enabled", "budget_tokens": budget}, "_auto_detect": True}
+
+
+def _extract_reasoning(response) -> Optional[str]:
+    """Извлекает reasoning_content из ответа (DeepSeek-R1, xAI и др.)."""
+    message = response.choices[0].message
+    return getattr(message, 'reasoning_content', None)
+
+
+async def _completion_with_auto_detect(
+    model: str,
+    messages: list,
+    reasoning: Optional[str],
+    **extra_kwargs
+) -> tuple[any, Optional[str]]:
+    """
+    Выполняет completion с автообнаружением reasoning поддержки.
+    Возвращает (response, reasoning_content).
+    При ошибке с неизвестной моделью — retry без reasoning параметров.
+    """
+    kwargs = _get_completion_kwargs(model)
+    kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
+    kwargs.update(extra_kwargs)
+
+    # Получаем параметры reasoning
+    reasoning_kwargs = _get_reasoning_kwargs(model, reasoning)
+    auto_detect = reasoning_kwargs.pop("_auto_detect", False)
+
+    if reasoning_kwargs:
+        kwargs.update(reasoning_kwargs)
+
+    try:
+        response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
+        reasoning_content = _extract_reasoning(response)
+
+        # Автообнаружение: успех — кэшируем тип
+        if auto_detect and reasoning:
+            _cache_reasoning_type(model, "thinking")
+
+        return response, reasoning_content
+
+    except Exception as e:
+        error_str = str(e).lower()
+        is_param_error = any(x in error_str for x in [
+            "thinking", "budget_tokens", "reasoning_effort",
+            "unsupported", "invalid parameter", "unknown parameter"
+        ])
+
+        # Если ошибка из-за параметра и это автообнаружение — retry без reasoning
+        if auto_detect and is_param_error and reasoning_kwargs:
+            # Убираем reasoning параметры и пробуем снова
+            for key in reasoning_kwargs:
+                kwargs.pop(key, None)
+
+            response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
+            # Кэшируем что модель не поддерживает reasoning
+            _cache_reasoning_type(model, None)
+            return response, None
+
+        raise
+
+
 # ===== Pydantic Models =====
 class ConsultExpertInput(BaseModel):
     '''Входные параметры для консультации с экспертом.'''
@@ -207,6 +386,11 @@ class ConsultExpertInput(BaseModel):
     response_format: ResponseFormat = Field(
         default=ResponseFormat.MARKDOWN,
         description="Формат ответа: markdown (читаемый) или json (структурированный)"
+    )
+    reasoning: Optional[str] = Field(
+        default=None,
+        description="Уровень reasoning для thinking-моделей: low, medium, high. Автоматически конвертируется в нужный формат для модели.",
+        pattern="^(low|medium|high)$"
     )
 
 
@@ -237,6 +421,11 @@ class CompareExpertsInput(BaseModel):
     response_format: ResponseFormat = Field(
         default=ResponseFormat.MARKDOWN,
         description="Формат ответа: markdown или json"
+    )
+    reasoning: Optional[str] = Field(
+        default=None,
+        description="Уровень reasoning для thinking-моделей: low, medium, high. Автоматически конвертируется в нужный формат для модели.",
+        pattern="^(low|medium|high)$"
     )
 
 
@@ -289,20 +478,30 @@ async def advisor_consult_expert(params: ConsultExpertInput) -> str:
     ]
 
     try:
-        kwargs = _get_completion_kwargs(params.model)
-        kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
-        response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
+        response, reasoning_content = await _completion_with_auto_detect(
+            model=params.model,
+            messages=messages,
+            reasoning=params.reasoning
+        )
         answer = response.choices[0].message.content
 
         if params.response_format == ResponseFormat.JSON:
-            return json.dumps({
+            result = {
                 "model": params.model,
                 "query": params.query,
                 "answer": answer,
                 "cached": getattr(response, '_hidden_params', {}).get('cache_hit', False)
-            }, ensure_ascii=False, indent=2)
+            }
+            if reasoning_content:
+                result["reasoning"] = reasoning_content
+            return json.dumps(result, ensure_ascii=False, indent=2)
 
-        return f"## Ответ от {params.model}\n\n{answer}"
+        # Добавляем reasoning в markdown если есть
+        output = f"## Ответ от {params.model}\n\n"
+        if reasoning_content:
+            output += f"<details>\n<summary>💭 Reasoning</summary>\n\n{reasoning_content}\n\n</details>\n\n"
+        output += answer
+        return output
     except Exception as e:
         return _format_error(e)
 
@@ -353,19 +552,21 @@ async def advisor_compare_experts(params: CompareExpertsInput) -> str:
         {"role": "user", "content": f"{params.query}\n\nКонтекст:\n{params.context}" if params.context else params.query}
     ]
 
-    async def ask_model(model: str) -> tuple[str, str, bool]:
+    async def ask_model(model: str) -> tuple[str, str, Optional[str], bool]:
         # Проверка что провайдер включён
         error = _check_model_allowed(model)
         if error:
-            return model, f"Ошибка: {error}", True
+            return model, f"Ошибка: {error}", None, True
 
         try:
-            kwargs = _get_completion_kwargs(model)
-            kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
-            response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
-            return model, response.choices[0].message.content, False
+            response, reasoning_content = await _completion_with_auto_detect(
+                model=model,
+                messages=messages,
+                reasoning=params.reasoning
+            )
+            return model, response.choices[0].message.content, reasoning_content, False
         except Exception as e:
-            return model, _format_error(e), True
+            return model, _format_error(e), None, True
 
     results = await asyncio.gather(*[ask_model(m) for m in model_list])
 
@@ -373,15 +574,19 @@ async def advisor_compare_experts(params: CompareExpertsInput) -> str:
         return json.dumps({
             "query": params.query,
             "experts": [
-                {"model": model, "answer": answer, "error": is_error}
-                for model, answer, is_error in results
+                {"model": model, "answer": answer, "reasoning": reasoning, "error": is_error}
+                for model, answer, reasoning, is_error in results
             ]
         }, ensure_ascii=False, indent=2)
 
     output = [f"# Сравнение мнений экспертов\n\n**Вопрос:** {params.query}\n"]
-    for model, answer, is_error in results:
+    for model, answer, reasoning, is_error in results:
         status = "❌" if is_error else "✅"
-        output.append(f"---\n\n## {status} {model}\n\n{answer}\n")
+        section = f"---\n\n## {status} {model}\n\n"
+        if reasoning:
+            section += f"<details>\n<summary>💭 Reasoning</summary>\n\n{reasoning}\n\n</details>\n\n"
+        section += f"{answer}\n"
+        output.append(section)
     return "\n".join(output)
 
 
