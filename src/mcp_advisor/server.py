@@ -254,22 +254,25 @@ def _is_model_cached(model: str) -> bool:
 def _get_reasoning_type(model: str) -> Optional[str]:
     """
     Определяет тип reasoning для модели.
-    Приоритет: провайдер -> disk cache -> справочник -> None
+    Приоритет: disk cache -> справочник -> провайдер (с auto_detect) -> None
     """
-    provider = _get_provider(model)
-
-    # 1. По провайдеру (точное знание)
-    if provider in ("anthropic", "gemini", "vertex_ai"):
-        return "thinking"
-    if provider in ("openai", "xai"):
-        return "reasoning_effort"
-
-    # 2. Из disk cache (автообнаруженные ранее)
+    # 1. Из disk cache (автообнаруженные ранее) — приоритет
     if model in _reasoning_cache:
         return _reasoning_cache[model]
 
-    # 3. Из справочника (по паттернам в имени)
-    return _get_reasoning_type_from_registry(model)
+    # 2. Из справочника (по паттернам в имени)
+    from_registry = _get_reasoning_type_from_registry(model)
+    if from_registry:
+        return from_registry
+
+    # 3. По провайдеру — только anthropic точно поддерживает thinking
+    provider = _get_provider(model)
+    if provider == "anthropic":
+        return "thinking"
+
+    # Остальные провайдеры (gemini, openai, xai) — зависит от модели
+    # Будет auto_detect
+    return None
 
 
 def _cache_reasoning_type(model: str, reasoning_type: Optional[str]):
