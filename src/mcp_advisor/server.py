@@ -207,6 +207,7 @@ KNOWN_REASONING_MODELS = {
     "o3-": "reasoning_effort",
     # Gemini thinking models
     "gemini-2.5": "thinking",
+    "gemini-3": "thinking",
     # Общие паттерны
     "thinking": "thinking",
     "reasoner": "thinking",
