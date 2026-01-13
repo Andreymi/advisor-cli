@@ -299,8 +299,12 @@ def _get_reasoning_kwargs(model: str, reasoning: Optional[str]) -> dict:
         # Модель в кэше с None — точно не поддерживает reasoning
         return {}
 
-    # Неизвестная модель — пробуем thinking (автообнаружение по ответу)
-    return {"thinking": {"type": "enabled", "budget_tokens": budget}, "_auto_detect": True}
+    # Неизвестная модель — auto_detect
+    # OpenAI/xAI используют reasoning_effort, остальные — thinking
+    provider = _get_provider(model)
+    if provider in ("openai", "xai"):
+        return {"reasoning_effort": reasoning, "_auto_detect": True, "_auto_type": "reasoning_effort"}
+    return {"thinking": {"type": "enabled", "budget_tokens": budget}, "_auto_detect": True, "_auto_type": "thinking"}
 
 
 def _extract_reasoning(response) -> Optional[str]:
@@ -327,6 +331,7 @@ async def _completion_with_auto_detect(
     # Получаем параметры reasoning
     reasoning_kwargs = _get_reasoning_kwargs(model, reasoning)
     auto_detect = reasoning_kwargs.pop("_auto_detect", False)
+    auto_type = reasoning_kwargs.pop("_auto_type", "thinking")
 
     if reasoning_kwargs:
         kwargs.update(reasoning_kwargs)
@@ -337,7 +342,7 @@ async def _completion_with_auto_detect(
 
         # Автообнаружение: успех — кэшируем тип
         if auto_detect and reasoning:
-            _cache_reasoning_type(model, "thinking")
+            _cache_reasoning_type(model, auto_type)
 
         return response, reasoning_content
 
