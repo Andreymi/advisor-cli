@@ -189,6 +189,9 @@ THINKING_BUDGETS = {
 # ===== Справочник reasoning моделей =====
 # Формат: паттерн в имени модели -> тип параметра ("thinking" или "reasoning_effort")
 KNOWN_REASONING_MODELS = {
+    # Anthropic (только Sonnet и Opus, не Haiku)
+    "sonnet": "thinking",
+    "opus": "thinking",
     # DeepSeek семейство
     "deepseek-r1": "thinking",
     "deepseek-v3": "thinking",
@@ -202,6 +205,8 @@ KNOWN_REASONING_MODELS = {
     # OpenAI reasoning
     "o1-": "reasoning_effort",
     "o3-": "reasoning_effort",
+    # Gemini thinking models
+    "gemini-2.5": "thinking",
     # Общие паттерны
     "thinking": "thinking",
     "reasoner": "thinking",
@@ -254,7 +259,7 @@ def _is_model_cached(model: str) -> bool:
 def _get_reasoning_type(model: str) -> Optional[str]:
     """
     Определяет тип reasoning для модели.
-    Приоритет: disk cache -> справочник -> провайдер (с auto_detect) -> None
+    Приоритет: disk cache -> справочник -> auto_detect
     """
     # 1. Из disk cache (автообнаруженные ранее) — приоритет
     if model in _reasoning_cache:
@@ -265,13 +270,8 @@ def _get_reasoning_type(model: str) -> Optional[str]:
     if from_registry:
         return from_registry
 
-    # 3. По провайдеру — только anthropic точно поддерживает thinking
-    provider = _get_provider(model)
-    if provider == "anthropic":
-        return "thinking"
-
-    # Остальные провайдеры (gemini, openai, xai) — зависит от модели
-    # Будет auto_detect
+    # 3. Все остальные — auto_detect
+    # Даже anthropic: Haiku не поддерживает thinking, только Sonnet/Opus
     return None
 
 
