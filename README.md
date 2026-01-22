@@ -1,23 +1,48 @@
 # Advisor CLI
 
-CLI и MCP сервер для получения "второго мнения" от альтернативных LLM (Gemini, GPT, Ollama Cloud).
+Get second opinions from alternative LLMs (Gemini, GPT, DeepSeek, Ollama).
+
+CLI и MCP сервер для получения "второго мнения" от альтернативных LLM.
+
+## Quick Start
+
+```bash
+# One-line install (installs uv if needed)
+curl -fsSL https://raw.githubusercontent.com/mironovdm/advisor-cli/main/install.sh | sh
+
+# Then configure
+advisor setup
+advisor mcp install
+```
 
 ## Возможности
 
 **CLI команды:**
 - `advisor ask` — получить ответ от одной модели
 - `advisor compare` — сравнить ответы нескольких моделей
-- `advisor result` — получить результат async задачи
+- `advisor mcp install` — установить MCP в Claude Code/Desktop
 
 **Дополнительно:**
 - Stdin pipe: `cat file.py | advisor ask "Review"`
 - Файловый ввод: `advisor ask -f code.py "Review"`
 - Async выполнение: `advisor compare --async`
 - JSON/Markdown форматы
-- MCP сервер (опционально)
+- Автоматическая MCP интеграция
 - Disk cache с TTL
 
 ## Установка
+
+### Рекомендуемый способ (uv tool)
+
+```bash
+# Установить uv (если нет)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Установить advisor-cli
+uv tool install advisor-cli
+```
+
+### Через pip
 
 ```bash
 # Базовая установка (только CLI)
@@ -33,13 +58,12 @@ pip install advisor-cli[wizard]
 pip install advisor-cli[all]
 ```
 
-Или через uv:
+### Из исходников
 
 ```bash
-git clone <repo-url>
-cd mcp-advisor
-uv sync                    # базовая установка
-uv pip install -e ".[all]" # с MCP и wizard
+git clone https://github.com/mironovdm/advisor-cli
+cd advisor-cli
+uv sync --extra all
 ```
 
 ## Конфигурация
@@ -48,6 +72,16 @@ uv pip install -e ".[all]" # с MCP и wizard
 
 ```bash
 advisor setup
+```
+
+### Автоматическая настройка (CI/Scripts)
+
+```bash
+# Из переменных окружения
+GEMINI_API_KEY=xxx OPENAI_API_KEY=xxx advisor setup -y
+
+# Установить MCP без вопросов
+advisor mcp install -y
 ```
 
 ### Ручная настройка (.env)
@@ -123,11 +157,30 @@ advisor config compare "openai/gpt-4o,gemini/gemini-2.0-flash"
 advisor config format json
 ```
 
-## MCP использование
+## MCP Integration
 
-### Подключение к Claude Code
+### Автоматическая установка (рекомендуется)
 
-Добавить в `.mcp.json`:
+```bash
+# Установить в Claude Code и Claude Desktop
+advisor mcp install
+
+# Только в текущий проект
+advisor mcp install --scope project
+
+# Только в Claude Desktop
+advisor mcp install --target desktop
+
+# Проверить статус
+advisor mcp status
+
+# Удалить
+advisor mcp uninstall
+```
+
+### Ручная настройка
+
+Добавить в `.mcp.json` (Claude Code):
 
 ```json
 {
@@ -135,19 +188,6 @@ advisor config format json
     "advisor_mcp": {
       "command": "advisor",
       "args": ["run"]
-    }
-  }
-}
-```
-
-Или через uv:
-
-```json
-{
-  "mcpServers": {
-    "advisor_mcp": {
-      "command": "uv",
-      "args": ["run", "advisor", "run"]
     }
   }
 }
