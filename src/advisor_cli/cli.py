@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 """CLI интерфейс для advisor-cli."""
 
-import warnings
-
-warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-warnings.filterwarnings("ignore", message="coroutine .* was never awaited")
-
 import asyncio
 import json
 import sys
 import tempfile
 import time
 import uuid
+import warnings
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from .core import (
+# Suppress warnings from litellm/pydantic before importing core
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+warnings.filterwarnings("ignore", message="coroutine .* was never awaited")
+
+from .core import (  # noqa: E402
     CUSTOM_PROVIDERS,
     DEFAULT_MODEL,
     DEFAULT_MODELS_COMPARE,
     ENABLED_PROVIDERS,
-    ConsultExpertInput,
     CompareExpertsInput,
+    ConsultExpertInput,
     ResponseFormat,
-    consult_expert,
     compare_experts,
+    consult_expert,
     init_cache,
 )
-from .file_utils import read_context_file
+from .file_utils import read_context_file  # noqa: E402
 
 app = typer.Typer(
     name="advisor",
