@@ -1,7 +1,36 @@
 {
   "permissions": {
     "allow": [
-      "mcp__advisor_mcp__*"
+      "mcp__advisor_mcp__*",
+      "Bash(ruff format:*)",
+      "Bash(ruff check:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "example-skills@anthropic-agent-skills": false
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/protect-env.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/ruff-format.sh"
+          }
+        ]
+      }
     ]
   }
 }
