@@ -44,6 +44,17 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/advisor_cli"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".claude/",
+    ".mcp.json",
+    "docs/plans/",
+    "ROADMAP.md",
+    "uv.lock",
+    ".env*",
+    "tests/",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
