@@ -118,3 +118,106 @@ def remove_mcp_server(config: dict, name: str) -> dict:
     if "mcpServers" in config and name in config["mcpServers"]:
         del config["mcpServers"][name]
     return config
+
+
+def is_advisor_config(server_config: dict) -> bool:
+    """Check if config looks like advisor_mcp."""
+    cmd = server_config.get("command", "")
+    args = server_config.get("args", [])
+
+    # Check for advisor command
+    if "advisor" in cmd:
+        return True
+    # Check for old mcp-advisor command
+    if "mcp-advisor" in cmd or "mcp-advisor" in str(args):
+        return True
+    return False
+
+
+def is_outdated_config(server_config: dict) -> bool:
+    """Check if config uses old mcp-advisor command."""
+    cmd = server_config.get("command", "")
+    args = server_config.get("args", [])
+
+    # Old style: uv run mcp-advisor or just mcp-advisor
+    if "mcp-advisor" in cmd:
+        return True
+    if "mcp-advisor" in args:
+        return True
+    # Old style: uv run --directory ... mcp-advisor
+    if len(args) >= 1 and args[-1] == "mcp-advisor":
+        return True
+    return False
+
+
+def _check_config_conflicts(
+    config: dict, location: str, conflicts: list[Conflict]
+) -> None:
+    """Helper to check conflicts in a single config."""
+    servers = get_mcp_servers(config)
+
+    if "advisor_mcp" in servers:
+        server = servers["advisor_mcp"]
+        if is_outdated_config(server):
+            conflicts.append(
+                Conflict(
+                    type=ConflictType.OUTDATED,
+                    location=location,
+                    message="Устаревшая команда (mcp-advisor → advisor run)",
+                    current_config=server,
+                )
+            )
+        elif is_advisor_config(server):
+            conflicts.append(
+                Conflict(
+                    type=ConflictType.DUPLICATE,
+                    location=location,
+                    message="advisor_mcp уже установлен",
+                    current_config=server,
+                )
+            )
+        else:
+            conflicts.append(
+                Conflict(
+                    type=ConflictType.NAME_COLLISION,
+                    location=location,
+                    message="advisor_mcp указывает на другой сервер",
+                    current_config=server,
+                )
+            )
+
+
+def check_conflicts(scope: Scope, target: Target) -> list[Conflict]:
+    """Check for conflicts before installation."""
+    conflicts: list[Conflict] = []
+    paths = get_config_paths()
+
+    # Check Claude Code user config
+    if target in (Target.ALL, Target.CLAUDE_CODE) and scope == Scope.USER:
+        config = read_config(paths["claude_code_user"])
+        _check_config_conflicts(config, "~/.claude.json", conflicts)
+
+    # Check Claude Code project config
+    if target in (Target.ALL, Target.CLAUDE_CODE) and scope == Scope.PROJECT:
+        config = read_config(paths["claude_code_project"])
+        _check_config_conflicts(config, ".mcp.json", conflicts)
+
+        # Check if project overrides user
+        user_config = read_config(paths["claude_code_user"])
+        if "advisor_mcp" in get_mcp_servers(user_config):
+            conflicts.append(
+                Conflict(
+                    type=ConflictType.OVERRIDE,
+                    location=".mcp.json",
+                    message="Проектный конфиг перекроет глобальный (~/.claude.json)",
+                )
+            )
+
+    # Check Claude Desktop
+    if target in (Target.ALL, Target.DESKTOP):
+        desktop_path = paths.get("claude_desktop")
+        if desktop_path:
+            config = read_config(desktop_path)
+            _check_config_conflicts(config, "Claude Desktop", conflicts)
+
+    return conflicts
