@@ -1,6 +1,6 @@
 [project]
 name = "advisor-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Get second opinions from alternative LLMs (Gemini, GPT, DeepSeek, Ollama)"
 readme = "README.md"
 license = "MIT"
@@ -22,10 +22,11 @@ dependencies = [
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "typer>=0.12.0",
+    "diskcache>=5.0.0",
 ]
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.0.0", "diskcache>=5.0.0"]
+mcp = ["mcp>=1.0.0"]
 wizard = ["questionary>=2.0.0", "rich>=13.0.0"]
 all = ["advisor-cli[mcp,wizard]"]
 
