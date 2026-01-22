@@ -78,3 +78,43 @@ def get_advisor_config_for_desktop() -> dict:
 def has_project_mcp_config() -> bool:
     """Check if .mcp.json exists in current directory."""
     return (Path.cwd() / ".mcp.json").exists()
+
+
+def read_config(path: Path) -> dict:
+    """Read JSON config file, return empty dict if not exists."""
+    import json
+
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def write_config(path: Path, config: dict) -> None:
+    """Write JSON config file, creating parent dirs if needed."""
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+
+
+def get_mcp_servers(config: dict) -> dict:
+    """Extract mcpServers from config."""
+    return config.get("mcpServers", {})
+
+
+def set_mcp_server(config: dict, name: str, server_config: dict) -> dict:
+    """Add or update MCP server in config."""
+    if "mcpServers" not in config:
+        config["mcpServers"] = {}
+    config["mcpServers"][name] = server_config
+    return config
+
+
+def remove_mcp_server(config: dict, name: str) -> dict:
+    """Remove MCP server from config."""
+    if "mcpServers" in config and name in config["mcpServers"]:
+        del config["mcpServers"][name]
+    return config
