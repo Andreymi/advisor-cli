@@ -8,7 +8,7 @@ CLI and MCP server for consulting alternative LLMs when you need a different per
 
 ```bash
 # One-line install (installs uv if needed)
-curl -fsSL https://raw.githubusercontent.com/mironovdm/advisor-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Andreymi/advisor-cli/main/install.sh | sh
 
 # Configure
 advisor setup
@@ -61,7 +61,7 @@ pip install advisor-cli[all]
 ### From source
 
 ```bash
-git clone https://github.com/mironovdm/advisor-cli
+git clone https://github.com/Andreymi/advisor-cli
 cd advisor-cli
 uv sync --extra all
 ```

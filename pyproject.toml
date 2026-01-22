@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "Get second opinions from alternative LLMs (Gemini, GPT, DeepSeek, Ollama)"
 readme = "README.md"
 license = "MIT"
-authors = [{ name = "Andrey Miroshkin" }]
+authors = [{ name = "And#ocean" }]
 keywords = ["llm", "cli", "mcp", "ai", "gemini", "openai", "claude", "anthropic"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -30,9 +30,9 @@ wizard = ["questionary>=2.0.0", "rich>=13.0.0"]
 all = ["advisor-cli[mcp,wizard]"]
 
 [project.urls]
-Homepage = "https://github.com/mironovdm/advisor-cli"
-Repository = "https://github.com/mironovdm/advisor-cli"
-Documentation = "https://github.com/mironovdm/advisor-cli#readme"
+Homepage = "https://github.com/Andreymi/advisor-cli"
+Repository = "https://github.com/Andreymi/advisor-cli"
+Documentation = "https://github.com/Andreymi/advisor-cli#readme"
 
 [project.scripts]
 advisor = "advisor_cli.cli:app"
