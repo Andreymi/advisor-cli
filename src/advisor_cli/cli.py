@@ -309,12 +309,30 @@ def run():
 
 
 @app.command()
-def setup():
+def setup(
+    yes: bool = typer.Option(
+        False, "-y", help="Неинтерактивный режим (использовать env vars)"
+    ),
+    providers: Optional[str] = typer.Option(
+        None, "-p", "--providers", help="Провайдеры через запятую"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "-m", "--model", help="Модель по умолчанию"
+    ),
+):
     """Интерактивная настройка конфигурации (требует установки с [wizard])."""
     try:
         from .setup_wizard import run_setup
 
-        run_setup()
+        provider_list = None
+        if providers:
+            provider_list = [p.strip() for p in providers.split(",")]
+
+        run_setup(
+            non_interactive=yes,
+            providers=provider_list,
+            model=model,
+        )
     except ImportError:
         print_output(
             "Wizard не установлен. Установите: pip install advisor-cli[wizard]",

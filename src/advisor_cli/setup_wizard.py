@@ -210,6 +210,46 @@ def get_custom_providers() -> list[str]:
     return [p.strip() for p in custom.split(",") if p.strip()]
 
 
+def setup_from_env() -> bool:
+    """Setup from environment variables (non-interactive mode)."""
+    env_vars: dict[str, str] = {}
+    enabled_providers = []
+
+    # Check for API keys in environment
+    for provider_id, info in PROVIDER_INFO.items():
+        env_key = info["env_key"]
+        value = os.environ.get(env_key)
+        if value:
+            env_vars[env_key] = value
+            enabled_providers.append(provider_id)
+
+    if not enabled_providers:
+        return False
+
+    # Set defaults
+    first_provider = enabled_providers[0]
+    default_model = PROVIDER_INFO[first_provider]["models"][0]
+    env_vars["ADVISOR_DEFAULT_MODEL"] = default_model
+
+    # Compare models: one from each provider
+    compare_models = []
+    for provider_id in enabled_providers[:3]:  # Max 3 for compare
+        compare_models.append(PROVIDER_INFO[provider_id]["models"][0])
+    env_vars["ADVISOR_DEFAULT_MODELS_COMPARE"] = ",".join(compare_models)
+
+    # Default options
+    env_vars["ADVISOR_CACHE_ENABLED"] = "true"
+    env_vars["ADVISOR_CACHE_TTL"] = "3600"
+    env_vars["ADVISOR_VERBOSE"] = "false"
+
+    # Merge with existing
+    existing = load_existing_env()
+    existing.update(env_vars)
+    save_env(existing)
+
+    return True
+
+
 def input_custom_model(enabled_providers: list[str]) -> str | None:
     """Ввод и проверка произвольной модели."""
     console.print(
@@ -423,8 +463,29 @@ def configure_options(existing_env: dict[str, str]) -> dict[str, str]:
     return options
 
 
-def run_setup():
-    """Главная функция wizard'а."""
+def run_setup(
+    non_interactive: bool = False,
+    providers: list[str] | None = None,
+    model: str | None = None,
+):
+    """Главная функция wizard'а.
+
+    Args:
+        non_interactive: If True, use defaults and env vars without prompts
+        providers: List of provider IDs to configure (for -y mode)
+        model: Default model to set (for -y mode)
+    """
+    if non_interactive:
+        success = setup_from_env()
+        if success:
+            console.print(
+                "[green]✓ Конфигурация создана из переменных окружения[/green]"
+            )
+        else:
+            console.print("[red]✗ Не найдены API ключи в окружении[/red]")
+            console.print("[dim]Установите GEMINI_API_KEY, OPENAI_API_KEY и т.д.[/dim]")
+        return
+
     console.print(
         Panel(
             "[bold cyan]MCP Advisor — Настройка[/bold cyan]\n\n"
