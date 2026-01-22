@@ -221,3 +221,118 @@ def check_conflicts(scope: Scope, target: Target) -> list[Conflict]:
             _check_config_conflicts(config, "Claude Desktop", conflicts)
 
     return conflicts
+
+
+def install_to_claude_code(scope: Scope) -> bool:
+    """Install advisor_mcp to Claude Code config."""
+    paths = get_config_paths()
+
+    if scope == Scope.PROJECT:
+        path = paths["claude_code_project"]
+    else:
+        path = paths["claude_code_user"]
+
+    config = read_config(path)
+    advisor_config = get_advisor_config_for_claude_code()
+    config = set_mcp_server(config, "advisor_mcp", advisor_config["advisor_mcp"])
+    write_config(path, config)
+    return True
+
+
+def install_to_desktop() -> bool:
+    """Install advisor_mcp to Claude Desktop config."""
+    paths = get_config_paths()
+    desktop_path = paths.get("claude_desktop")
+
+    if not desktop_path:
+        return False
+
+    config = read_config(desktop_path)
+    advisor_config = get_advisor_config_for_desktop()
+    config = set_mcp_server(config, "advisor_mcp", advisor_config["advisor_mcp"])
+    write_config(desktop_path, config)
+    return True
+
+
+def uninstall_from_claude_code(scope: Scope) -> bool:
+    """Remove advisor_mcp from Claude Code config."""
+    paths = get_config_paths()
+
+    if scope == Scope.PROJECT:
+        path = paths["claude_code_project"]
+    else:
+        path = paths["claude_code_user"]
+
+    if not path.exists():
+        return False
+
+    config = read_config(path)
+    if "advisor_mcp" not in get_mcp_servers(config):
+        return False
+
+    config = remove_mcp_server(config, "advisor_mcp")
+    write_config(path, config)
+    return True
+
+
+def uninstall_from_desktop() -> bool:
+    """Remove advisor_mcp from Claude Desktop config."""
+    paths = get_config_paths()
+    desktop_path = paths.get("claude_desktop")
+
+    if not desktop_path or not desktop_path.exists():
+        return False
+
+    config = read_config(desktop_path)
+    if "advisor_mcp" not in get_mcp_servers(config):
+        return False
+
+    config = remove_mcp_server(config, "advisor_mcp")
+    write_config(desktop_path, config)
+    return True
+
+
+def get_installation_status() -> dict[str, dict]:
+    """Get advisor_mcp installation status for all configs."""
+    paths = get_config_paths()
+    status: dict[str, dict] = {}
+
+    # Claude Code user
+    config = read_config(paths["claude_code_user"])
+    servers = get_mcp_servers(config)
+    if "advisor_mcp" in servers:
+        status["claude_code_user"] = {
+            "installed": True,
+            "outdated": is_outdated_config(servers["advisor_mcp"]),
+            "config": servers["advisor_mcp"],
+        }
+    else:
+        status["claude_code_user"] = {"installed": False}
+
+    # Claude Code project
+    config = read_config(paths["claude_code_project"])
+    servers = get_mcp_servers(config)
+    if "advisor_mcp" in servers:
+        status["claude_code_project"] = {
+            "installed": True,
+            "outdated": is_outdated_config(servers["advisor_mcp"]),
+            "config": servers["advisor_mcp"],
+        }
+    else:
+        status["claude_code_project"] = {"installed": False}
+
+    # Claude Desktop
+    desktop_path = paths.get("claude_desktop")
+    if desktop_path:
+        config = read_config(desktop_path)
+        servers = get_mcp_servers(config)
+        if "advisor_mcp" in servers:
+            status["claude_desktop"] = {
+                "installed": True,
+                "outdated": is_outdated_config(servers["advisor_mcp"]),
+                "config": servers["advisor_mcp"],
+            }
+        else:
+            status["claude_desktop"] = {"installed": False}
+
+    return status
