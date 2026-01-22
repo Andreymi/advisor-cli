@@ -17,17 +17,18 @@ ENV_FILE = PROJECT_ROOT / ".env"
 
 console = Console()
 
-# Кастомный стиль для questionary
+# Кастомный стиль для questionary (минималистичный, без цветного фона)
 WIZARD_STYLE = Style(
     [
         ("qmark", "fg:cyan bold"),
         ("question", "bold"),
         ("answer", "fg:cyan"),
         ("pointer", "fg:cyan bold"),
-        ("highlighted", "fg:cyan bold"),
-        ("selected", "fg:green"),
+        ("highlighted", "fg:cyan bold noreverse"),
+        ("selected", "fg:cyan noreverse"),
         ("separator", "fg:cyan"),
         ("instruction", "fg:gray"),
+        ("checkbox-selected", "fg:cyan"),
     ]
 )
 
@@ -354,7 +355,7 @@ def collect_api_key(provider: str, existing_value: str = "") -> str:
     return key or ""
 
 
-CUSTOM_MODEL_OPTION = "✏️  Ввести свою модель..."
+CUSTOM_MODEL_OPTION = "[Ввести свою модель]"
 
 
 def select_default_model(enabled_providers: list[str]) -> str:
