@@ -1,8 +1,10 @@
 {
   "mcpServers": {
     "advisor_mcp": {
-      "command": "uv",
-      "args": ["run", "mcp-advisor"]
+      "command": "advisor",
+      "args": [
+        "run"
+      ]
     }
   }
 }
