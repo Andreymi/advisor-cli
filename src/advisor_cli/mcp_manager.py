@@ -139,9 +139,13 @@ def is_outdated_config(server_config: dict) -> bool:
     cmd = server_config.get("command", "")
     args = server_config.get("args", [])
 
-    # Old style: uv run mcp-advisor or just mcp-advisor
-    if "mcp-advisor" in cmd:
+    # Extract just the command name (basename)
+    cmd_name = Path(cmd).name if cmd else ""
+
+    # Old style: command is mcp-advisor
+    if cmd_name == "mcp-advisor":
         return True
+    # Old style: mcp-advisor in args (e.g., uv run mcp-advisor)
     if "mcp-advisor" in args:
         return True
     # Old style: uv run --directory ... mcp-advisor
