@@ -13,6 +13,7 @@
 ## Commands
 - `uv run mcp-advisor` — запуск сервера
 - `uv sync` — установка зависимостей
+- `uv run pytest tests/ -v` — запуск тестов
 
 ## Hooks (автоматизация)
 - `PostToolUse` — ruff format/check для .py файлов
