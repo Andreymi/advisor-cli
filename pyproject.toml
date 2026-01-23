@@ -1,6 +1,6 @@
 [project]
 name = "advisor-cli"
-version = "0.2.2"
+version = "0.2.3"
 description = "Get second opinions from alternative LLMs (Gemini, GPT, DeepSeek, Ollama)"
 readme = "README.md"
 license = "MIT"
