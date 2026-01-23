@@ -15,48 +15,33 @@ Tracking technical debt for advisor-cli project.
 ### MEDIUM Priority
 
 #### 1. Subprocess security in async mode
-**File:** `cli.py:214-247`
+**File:** `cli_core.py:43-66`
 
 **Problem:** Background task execution via subprocess has issues:
-- No error handling if subprocess fails
 - No timeout — could hang forever
 - `start_new_session=True` orphans process if parent dies
 - No logging of subprocess start/failure
 
-**Solution:** Use structured async task queue or add proper error handling.
+**Partial fix (2026-01-24):** Added OSError handling in `_run_background_task()`.
 
----
-
-#### 2. cli.py too large (1100+ lines)
-**File:** `cli.py`
-
-**Problem:** Single file with 20 commands, hard to navigate.
-
-**Solution:** Split into modules:
-```
-cli.py          → entry point (~50 lines)
-cli_utils.py    → shared helpers (~100 lines)
-cli_core.py     → ask, compare, result, status (~300 lines)
-cli_config.py   → config sub-app (~150 lines)
-cli_mcp.py      → mcp sub-app (~250 lines)
-cli_skill.py    → skill sub-app (~150 lines)
-cli_install.py  → unified install (~100 lines)
-```
+**Remaining:** Add timeout mechanism or structured async task queue.
 
 ---
 
 ### LOW Priority
 
-#### 3. Magic numbers without constants
-**Files:** `cli.py`, `core.py`, `file_utils.py`
+#### 2. Magic numbers without constants
+**Files:** `core.py`, `file_utils.py`
 
 **Examples:**
-- `TASK_TTL = 3600` — no comment explaining 1 hour
-- `str(uuid.uuid4())[:8]` — arbitrary truncation
 - `error_msg[:150]` — arbitrary truncation
 - `MAX_FILE_SIZE = 100 * 1024` — arbitrary limit
 
-**Solution:** Extract to named constants with documentation.
+**Partial fix (2026-01-24):**
+- `TASK_TTL` → `TASK_TTL_SECONDS` with documentation
+- `uuid[:8]` → `TASK_ID_LENGTH = 8` constant
+
+**Solution:** Extract remaining to named constants with documentation.
 
 ---
 
@@ -106,6 +91,21 @@ cli_install.py  → unified install (~100 lines)
 - ✅ Added return type hints to CLI commands
 - ✅ Replaced bare `except:` with specific exceptions
 - ✅ Centralized `asyncio.run()` into `run_async` helper
+
+### 2026-01-24: CLI Split Sprint
+- ✅ Split cli.py from 1102 lines to 94 lines (91.5% reduction)
+- ✅ Created 7 focused modules:
+  - `cli_async.py` — async task utilities (TASK_TTL_SECONDS, TASK_ID_LENGTH)
+  - `cli_output.py` — print_output, _parse_format
+  - `cli_core.py` — ask, compare, result, status, models commands
+  - `cli_config.py` — config sub-app (single, compare, format, show, purge)
+  - `cli_mcp.py` — mcp sub-app (install, uninstall, status)
+  - `cli_skill.py` — skill sub-app (install, uninstall, status)
+  - `cli_install.py` — unified install/uninstall commands
+- ✅ Added OSError handling for subprocess in _run_background_task()
+- ✅ Documented TASK_TTL_SECONDS constant (was TASK_TTL)
+- ✅ Added TASK_ID_LENGTH constant for UUID truncation
+- ✅ Added 27 new tests for CLI modules
 
 ---
 

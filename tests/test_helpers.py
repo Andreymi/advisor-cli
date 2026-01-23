@@ -4,7 +4,7 @@ import pytest
 from click.exceptions import Exit as ClickExit
 from unittest.mock import patch
 
-from advisor_cli.cli import _parse_format
+from advisor_cli.cli_output import _parse_format
 from advisor_cli.core import ResponseFormat
 
 
