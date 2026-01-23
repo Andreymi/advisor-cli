@@ -119,47 +119,12 @@ def save_env(env_vars: dict[str, str]) -> None:
 def parse_litellm_error(e: Exception) -> str:
     """Парсит ошибки litellm в понятные сообщения.
 
-    Обрабатывает специфичные случаи, когда litellm возвращает
-    пустые или малоинформативные сообщения об ошибках.
+    Deprecated: используйте core.format_error() напрямую.
+    Эта функция сохранена для обратной совместимости.
     """
-    error_type = type(e).__name__
-    error_msg = str(e).strip()
+    from .core import format_error
 
-    # AuthenticationError с пустым или неинформативным сообщением
-    if "AuthenticationError" in error_type or "AuthenticationError" in error_msg:
-        if not error_msg or error_msg.endswith(":") or len(error_msg) < 30:
-            return "Неверный API ключ или ключ не имеет доступа к модели"
-
-    # RateLimitError
-    if "RateLimitError" in error_type or "429" in error_msg:
-        return "Превышен лимит запросов. Подождите и попробуйте снова"
-
-    # NotFoundError (модель не найдена)
-    if "NotFoundError" in error_type or "404" in error_msg:
-        return "Модель не найдена. Проверьте название"
-
-    # APIConnectionError
-    if "APIConnectionError" in error_type or "Connection" in error_msg:
-        return "Не удалось подключиться к API. Проверьте сеть"
-
-    # Timeout
-    if "timeout" in error_msg.lower() or "Timeout" in error_type:
-        return "Таймаут запроса. Попробуйте позже"
-
-    # Unauthorized
-    if "401" in error_msg or "Unauthorized" in error_msg:
-        return "Неверный API ключ"
-
-    # Общий fallback с обрезкой длинных сообщений
-    if error_msg:
-        # Убираем типичные префиксы litellm
-        for prefix in ["litellm.", "AuthenticationError:", "APIError:"]:
-            if error_msg.startswith(prefix):
-                error_msg = error_msg[len(prefix) :].strip()
-
-        return error_msg[:100] if len(error_msg) > 100 else error_msg
-
-    return "Неизвестная ошибка API"
+    return format_error(e, include_prefix=False)
 
 
 async def test_connection(provider: str, api_key: str) -> tuple[bool, str]:

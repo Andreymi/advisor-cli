@@ -178,46 +178,70 @@ def get_completion_kwargs(model: str) -> dict:
     return {"model": model}
 
 
-def format_error(e: Exception) -> str:
+def format_error(e: Exception, include_prefix: bool = True) -> str:
     """Форматирует ошибку litellm с понятным сообщением.
 
     Обрабатывает специфичные случаи, когда litellm возвращает
     пустые или малоинформативные сообщения об ошибках.
+
+    Args:
+        e: Исключение для форматирования.
+        include_prefix: Если True, добавляет "Ошибка: " в начало сообщения.
+
+    Returns:
+        Отформатированное сообщение об ошибке.
     """
     error_type = type(e).__name__
     error_msg = str(e).strip()
+    prefix = "Ошибка: " if include_prefix else ""
 
     # AuthenticationError с пустым или неинформативным сообщением
     if "AuthenticationError" in error_type or "AuthenticationError" in error_msg:
         if not error_msg or error_msg.endswith(":") or len(error_msg) < 30:
-            return "Ошибка: Неверный API ключ или ключ не имеет доступа к модели"
+            return f"{prefix}Неверный API ключ или ключ не имеет доступа к модели"
 
-    # Проверяем конкретные коды/типы ошибок
-    if "401" in error_msg or "Unauthorized" in error_msg:
-        return "Ошибка: Неверный API ключ. Проверьте переменные окружения."
-    if (
-        "429" in error_msg
-        or "rate limit" in error_msg.lower()
-        or "RateLimitError" in error_type
-    ):
-        return "Ошибка: Превышен лимит запросов. Подождите и попробуйте снова."
-    if "timeout" in error_msg.lower() or "Timeout" in error_type:
-        return "Ошибка: Таймаут запроса. Попробуйте позже."
-    if "404" in error_msg or "NotFoundError" in error_type:
-        return "Ошибка: Модель не найдена. Проверьте название."
-    if "APIConnectionError" in error_type or "Connection" in error_msg:
-        return "Ошибка: Не удалось подключиться к API. Проверьте сеть."
+    # Паттерны ошибок: (условие, сообщение)
+    error_patterns = [
+        (
+            lambda t, m: "401" in m or "Unauthorized" in m,
+            "Неверный API ключ. Проверьте переменные окружения.",
+        ),
+        (
+            lambda t, m: "429" in m
+            or "rate limit" in m.lower()
+            or "RateLimitError" in t,
+            "Превышен лимит запросов. Подождите и попробуйте снова.",
+        ),
+        (
+            lambda t, m: "timeout" in m.lower() or "Timeout" in t,
+            "Таймаут запроса. Попробуйте позже.",
+        ),
+        (
+            lambda t, m: "404" in m or "NotFoundError" in t,
+            "Модель не найдена. Проверьте название.",
+        ),
+        (
+            lambda t, m: "APIConnectionError" in t or "Connection" in m,
+            "Не удалось подключиться к API. Проверьте сеть.",
+        ),
+    ]
+
+    for condition, message in error_patterns:
+        if condition(error_type, error_msg):
+            return f"{prefix}{message}"
 
     # Очистка сообщения от типичных префиксов litellm
-    for prefix in ["litellm.", "AuthenticationError:", "APIError:"]:
-        if error_msg.startswith(prefix):
-            error_msg = error_msg[len(prefix) :].strip()
+    for litellm_prefix in ["litellm.", "AuthenticationError:", "APIError:"]:
+        if error_msg.startswith(litellm_prefix):
+            error_msg = error_msg[len(litellm_prefix) :].strip()
 
     # Обрезаем слишком длинные сообщения
     if len(error_msg) > 150:
         error_msg = error_msg[:150] + "..."
 
-    return f"Ошибка: {error_msg}" if error_msg else "Ошибка: Неизвестная ошибка API"
+    if error_msg:
+        return f"{prefix}{error_msg}"
+    return f"{prefix}Неизвестная ошибка API"
 
 
 # ===== Reasoning =====
