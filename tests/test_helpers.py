@@ -123,3 +123,20 @@ class TestRequireWizard:
 
         with pytest.raises(ClickExit):
             my_func()
+
+    def test_error_message_contains_install_command(self, capsys):
+        """Verify error message shows correct install command with [wizard]."""
+        from advisor_cli.utils import require_wizard
+
+        @require_wizard
+        def my_func():
+            raise ImportError("questionary not found")
+
+        with pytest.raises(ClickExit):
+            my_func()
+
+        captured = capsys.readouterr()
+        # Critical: [wizard] must not be eaten by rich markup parser
+        assert "[wizard]" in captured.out, (
+            f"Install command missing [wizard]. Got: {captured.out!r}"
+        )

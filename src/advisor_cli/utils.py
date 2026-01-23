@@ -45,9 +45,11 @@ def require_wizard(func: Callable[..., T]) -> Callable[..., T]:
             return func(*args, **kwargs)
         except ImportError:
             console = Console()
+            console.print("[red]Wizard not installed.[/red]")
             console.print(
-                "[red]Wizard not installed.[/red]\n"
-                "[dim]Install with: pip install advisor-cli[wizard][/dim]"
+                "Install with: pip install 'advisor-cli[wizard]'",
+                style="dim",
+                markup=False,
             )
             raise typer.Exit(1)
 
