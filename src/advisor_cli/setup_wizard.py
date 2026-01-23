@@ -73,7 +73,7 @@ async def test_connection(provider: str, api_key: str) -> tuple[bool, str]:
 
         await acompletion(messages=[{"role": "user", "content": "Hi"}], **kwargs)
         return True, "OK"
-    except Exception as e:
+    except Exception as e:  # LiteLLM can raise various provider-specific exceptions
         return False, parse_litellm_error(e)
 
 
@@ -99,7 +99,7 @@ async def test_model(model: str) -> tuple[bool, str]:
 
         await acompletion(messages=[{"role": "user", "content": "Hi"}], **kwargs)
         return True, "OK"
-    except Exception as e:
+    except Exception as e:  # LiteLLM can raise various provider-specific exceptions
         return False, parse_litellm_error(e)
 
 

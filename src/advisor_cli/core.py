@@ -72,7 +72,7 @@ def init_cache() -> bool:
             )
         CACHE_ACTIVE = True
         return True
-    except Exception as e:
+    except (ImportError, OSError, PermissionError) as e:
         print(f"[advisor] Cache init failed: {e}. Continuing without cache.")
         return False
 
@@ -261,7 +261,7 @@ def _load_reasoning_cache() -> dict[str, Optional[str]]:
         if REASONING_CACHE_FILE.exists():
             with open(REASONING_CACHE_FILE, "r") as f:
                 return json.load(f)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         pass
     return {}
 
@@ -272,7 +272,7 @@ def _save_reasoning_cache():
         CACHE_DIR.mkdir(exist_ok=True)
         with open(REASONING_CACHE_FILE, "w") as f:
             json.dump(_reasoning_cache, f, indent=2)
-    except Exception:
+    except (OSError, PermissionError):
         pass
 
 
@@ -374,7 +374,7 @@ async def completion_with_auto_detect(
 
         return response, reasoning_content
 
-    except Exception as e:
+    except Exception as e:  # LiteLLM can raise various provider-specific exceptions
         error_str = str(e).lower()
         is_param_error = any(
             x in error_str
@@ -520,7 +520,7 @@ async def consult_expert(params: ConsultExpertInput) -> str:
             output += f"<details>\n<summary>Reasoning</summary>\n\n{reasoning_content}\n\n</details>\n\n"
         output += answer
         return output
-    except Exception as e:
+    except Exception as e:  # LiteLLM can raise various provider-specific exceptions
         return format_error(e)
 
 
@@ -546,7 +546,7 @@ async def compare_experts(params: CompareExpertsInput) -> str:
                 model=model, messages=messages, reasoning=params.reasoning
             )
             return model, response.choices[0].message.content, reasoning_content, False
-        except Exception as e:
+        except Exception as e:  # LiteLLM can raise various provider-specific exceptions
             return model, format_error(e), None, True
 
     results = await asyncio.gather(*[ask_model(m) for m in model_list])
