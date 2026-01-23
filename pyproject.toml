@@ -50,7 +50,7 @@ artifacts = ["src/advisor_cli/data/**"]
 exclude = [
     ".claude/",
     ".mcp.json",
-    "docs/plans/",
+    "docs/",
     "ROADMAP.md",
     "uv.lock",
     ".env*",

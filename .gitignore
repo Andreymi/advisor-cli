@@ -34,3 +34,7 @@ build/
 *.egg-info/
 settings.local.json
 .mcp_cache/
+
+# Internal docs (local only, not pushed to GitHub)
+docs/
+ROADMAP.md
