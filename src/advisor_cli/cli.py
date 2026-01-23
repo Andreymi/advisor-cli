@@ -97,6 +97,34 @@ def print_output(text: str, error: bool = False):
         sys.stdout.write(text + "\n")
 
 
+def _parse_format(format_str: str | None) -> ResponseFormat:
+    """Парсит строку формата в ResponseFormat enum.
+
+    Args:
+        format_str: "json", "markdown", or None
+
+    Returns:
+        ResponseFormat enum value
+
+    Raises:
+        typer.Exit: If format is invalid
+    """
+    if not format_str:
+        return ResponseFormat.MARKDOWN
+
+    format_lower = format_str.lower()
+    if format_lower == "json":
+        return ResponseFormat.JSON
+    elif format_lower == "markdown":
+        return ResponseFormat.MARKDOWN
+    else:
+        print_output(
+            f"Неизвестный формат: {format_str}. Используйте markdown или json",
+            error=True,
+        )
+        raise typer.Exit(1)
+
+
 # ===== Commands =====
 @app.command()
 def ask(
@@ -125,17 +153,7 @@ def ask(
         print_output(str(e), error=True)
         raise typer.Exit(1)
 
-    # Формат ответа
-    response_format = ResponseFormat.MARKDOWN
-    if format:
-        if format.lower() == "json":
-            response_format = ResponseFormat.JSON
-        elif format.lower() != "markdown":
-            print_output(
-                f"Неизвестный формат: {format}. Используйте markdown или json",
-                error=True,
-            )
-            raise typer.Exit(1)
+    response_format = _parse_format(format)
 
     params = ConsultExpertInput(
         query=query,
@@ -179,17 +197,7 @@ def compare(
         print_output(str(e), error=True)
         raise typer.Exit(1)
 
-    # Формат ответа
-    response_format = ResponseFormat.MARKDOWN
-    if format:
-        if format.lower() == "json":
-            response_format = ResponseFormat.JSON
-        elif format.lower() != "markdown":
-            print_output(
-                f"Неизвестный формат: {format}. Используйте markdown или json",
-                error=True,
-            )
-            raise typer.Exit(1)
+    response_format = _parse_format(format)
 
     params = CompareExpertsInput(
         query=query,
