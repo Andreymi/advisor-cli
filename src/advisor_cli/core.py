@@ -38,7 +38,7 @@ DEFAULT_ROLE = os.getenv(
 
 
 def _hash_prompt(text: str) -> str:
-    """Генерирует короткий хэш для инвалидации кэша при смене промпта."""
+    """Generate short hash for cache invalidation when prompt changes."""
     return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
@@ -53,7 +53,7 @@ CACHE_ACTIVE = False
 
 
 def init_cache() -> bool:
-    """Инициализация кэша с graceful degradation."""
+    """Initialize cache with graceful degradation."""
     global CACHE_ACTIVE
 
     if not CACHE_ENABLED:
@@ -113,7 +113,7 @@ DEFAULT_MODELS_COMPARE = os.getenv(
 
 # ===== Enums =====
 class ResponseFormat(str, Enum):
-    """Формат ответа от эксперта."""
+    """Response format from expert."""
 
     MARKDOWN = "markdown"
     JSON = "json"
@@ -121,12 +121,12 @@ class ResponseFormat(str, Enum):
 
 # ===== Утилиты =====
 def get_provider(model: str) -> str:
-    """Извлекает имя провайдера из модели (gemini/model -> gemini)."""
+    """Extract provider name from model (gemini/model -> gemini)."""
     return model.split("/")[0] if "/" in model else model
 
 
 def check_model_allowed(model: str) -> str | None:
-    """Проверяет доступность модели. Возвращает ошибку или None."""
+    """Check if model is allowed. Returns error message or None."""
     provider = get_provider(model)
 
     if provider in PROVIDERS:
@@ -142,7 +142,7 @@ def check_model_allowed(model: str) -> str | None:
 
 
 def get_enabled_models_hint() -> str:
-    """Возвращает подсказку о доступных провайдерах."""
+    """Return hint about available providers."""
     all_enabled = ENABLED_PROVIDERS + CUSTOM_PROVIDERS
     if not all_enabled:
         return "Нет включённых провайдеров. Добавьте API ключи в .env"
@@ -150,7 +150,7 @@ def get_enabled_models_hint() -> str:
 
 
 def get_completion_kwargs(model: str) -> dict:
-    """Возвращает параметры для completion в зависимости от модели."""
+    """Return completion kwargs based on model."""
     if model.startswith("ollama-cloud/"):
         actual_model = model.replace("ollama-cloud/", "openai/")
         return {
@@ -162,17 +162,17 @@ def get_completion_kwargs(model: str) -> dict:
 
 
 def format_error(e: Exception, include_prefix: bool = True) -> str:
-    """Форматирует ошибку litellm с понятным сообщением.
+    """Format litellm exception into user-friendly message.
 
-    Обрабатывает специфичные случаи, когда litellm возвращает
-    пустые или малоинформативные сообщения об ошибках.
+    Handles specific cases where litellm returns empty or
+    uninformative error messages.
 
     Args:
-        e: Исключение для форматирования.
-        include_prefix: Если True, добавляет "Ошибка: " в начало сообщения.
+        e: Exception to format.
+        include_prefix: If True, adds "Ошибка: " prefix to message.
 
     Returns:
-        Отформатированное сообщение об ошибке.
+        Formatted error message.
     """
     error_type = type(e).__name__
     error_msg = str(e).strip()
@@ -256,7 +256,7 @@ _reasoning_cache: dict[str, Optional[str]] = {}
 
 
 def _load_reasoning_cache() -> dict[str, Optional[str]]:
-    """Загружает кэш автообнаруженных reasoning моделей."""
+    """Load cache of auto-detected reasoning models."""
     try:
         if REASONING_CACHE_FILE.exists():
             with open(REASONING_CACHE_FILE, "r") as f:
@@ -267,7 +267,7 @@ def _load_reasoning_cache() -> dict[str, Optional[str]]:
 
 
 def _save_reasoning_cache():
-    """Сохраняет кэш автообнаруженных reasoning моделей."""
+    """Save cache of auto-detected reasoning models."""
     try:
         CACHE_DIR.mkdir(exist_ok=True)
         with open(REASONING_CACHE_FILE, "w") as f:
@@ -280,7 +280,7 @@ _reasoning_cache = _load_reasoning_cache()
 
 
 def _get_reasoning_type_from_registry(model: str) -> Optional[str]:
-    """Ищет тип reasoning в справочнике по паттернам в имени модели."""
+    """Look up reasoning type in registry by model name patterns."""
     model_lower = model.lower()
     for pattern, reasoning_type in KNOWN_REASONING_MODELS.items():
         if pattern in model_lower:
@@ -289,12 +289,12 @@ def _get_reasoning_type_from_registry(model: str) -> Optional[str]:
 
 
 def _is_model_cached(model: str) -> bool:
-    """Проверяет, есть ли модель в кэше (независимо от значения)."""
+    """Check if model is in cache (regardless of value)."""
     return model in _reasoning_cache
 
 
 def _get_reasoning_type(model: str) -> Optional[str]:
-    """Определяет тип reasoning для модели."""
+    """Determine reasoning type for model."""
     if model in _reasoning_cache:
         return _reasoning_cache[model]
 
@@ -306,14 +306,14 @@ def _get_reasoning_type(model: str) -> Optional[str]:
 
 
 def _cache_reasoning_type(model: str, reasoning_type: Optional[str]):
-    """Сохраняет тип reasoning модели в кэш."""
+    """Save model's reasoning type to cache."""
     if model not in _reasoning_cache:
         _reasoning_cache[model] = reasoning_type
         _save_reasoning_cache()
 
 
 def get_reasoning_kwargs(model: str, reasoning: Optional[str]) -> dict:
-    """Конвертирует уровень reasoning в параметры для конкретной модели."""
+    """Convert reasoning level to model-specific parameters."""
     if not reasoning:
         return {}
 
@@ -342,7 +342,7 @@ def get_reasoning_kwargs(model: str, reasoning: Optional[str]) -> dict:
 
 
 def extract_reasoning(response) -> Optional[str]:
-    """Извлекает reasoning_content из ответа (DeepSeek-R1, xAI и др.)."""
+    """Extract reasoning_content from response (DeepSeek-R1, xAI, etc.)."""
     message = response.choices[0].message
     return getattr(message, "reasoning_content", None)
 
@@ -351,8 +351,8 @@ async def completion_with_auto_detect(
     model: str, messages: list, reasoning: Optional[str], **extra_kwargs
 ) -> tuple[any, Optional[str]]:
     """
-    Выполняет completion с автообнаружением reasoning поддержки.
-    Возвращает (response, reasoning_content).
+    Perform completion with auto-detection of reasoning support.
+    Returns (response, reasoning_content).
     """
     kwargs = get_completion_kwargs(model)
     kwargs["metadata"] = {"prompt_version": PROMPT_VERSION}
@@ -403,7 +403,7 @@ async def completion_with_auto_detect(
 
 # ===== Pydantic Models =====
 class ConsultExpertInput(BaseModel):
-    """Входные параметры для консультации с экспертом."""
+    """Input parameters for expert consultation."""
 
     model_config = ConfigDict(str_strip_whitespace=True, validate_assignment=True)
 
@@ -437,7 +437,7 @@ class ConsultExpertInput(BaseModel):
 
 
 class CompareExpertsInput(BaseModel):
-    """Входные параметры для сравнения мнений экспертов."""
+    """Input parameters for comparing expert opinions."""
 
     model_config = ConfigDict(str_strip_whitespace=True, validate_assignment=True)
 
@@ -468,7 +468,7 @@ class CompareExpertsInput(BaseModel):
 
 # ===== Core Functions =====
 def _build_messages(query: str, context: str | None, role: str) -> list[dict]:
-    """Создаёт список сообщений для LLM запроса.
+    """Build message list for LLM request.
 
     Args:
         query: User query
@@ -486,7 +486,7 @@ def _build_messages(query: str, context: str | None, role: str) -> list[dict]:
 
 
 async def consult_expert(params: ConsultExpertInput) -> str:
-    """Консультируется с экспертной LLM моделью."""
+    """Consult with expert LLM model."""
     if not params.model:
         return f"Ошибка: Модель не указана. {get_enabled_models_hint()}"
 
@@ -525,7 +525,7 @@ async def consult_expert(params: ConsultExpertInput) -> str:
 
 
 async def compare_experts(params: CompareExpertsInput) -> str:
-    """Получает мнения от нескольких LLM моделей параллельно."""
+    """Get opinions from multiple LLM models in parallel."""
     if not params.models:
         return f"Ошибка: Модели не указаны. {get_enabled_models_hint()}"
 

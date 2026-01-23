@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Централизованное управление путями конфигурации advisor-cli.
+"""Centralized configuration path management for advisor-cli.
 
-Следует XDG Base Directory Specification:
-- ~/.config/advisor/config.env — конфигурация и API ключи
-- ~/.cache/advisor/ — кэш ответов LLM
+Follows XDG Base Directory Specification:
+- ~/.config/advisor/config.env — configuration and API keys
+- ~/.cache/advisor/ — LLM response cache
 """
 
 import os
@@ -15,7 +15,7 @@ from typing import Any
 
 
 def get_config_dir() -> Path:
-    """Возвращает директорию конфигурации (XDG_CONFIG_HOME/advisor)."""
+    """Return configuration directory (XDG_CONFIG_HOME/advisor)."""
     xdg = os.environ.get("XDG_CONFIG_HOME", "")
     base = Path(xdg) if xdg else Path.home() / ".config"
     config_dir = base / "advisor"
@@ -24,7 +24,7 @@ def get_config_dir() -> Path:
 
 
 def get_cache_dir() -> Path:
-    """Возвращает директорию кэша (XDG_CACHE_HOME/advisor)."""
+    """Return cache directory (XDG_CACHE_HOME/advisor)."""
     xdg = os.environ.get("XDG_CACHE_HOME", "")
     base = Path(xdg) if xdg else Path.home() / ".cache"
     cache_dir = base / "advisor"
@@ -47,20 +47,20 @@ _LEGACY_CACHE_DIR = _LEGACY_PROJECT_ROOT / ".mcp_cache"
 
 
 def get_legacy_env_path() -> Path | None:
-    """Возвращает путь к старому .env файлу, если он существует."""
+    """Return path to legacy .env file if it exists."""
     if _LEGACY_ENV_FILE.exists():
         return _LEGACY_ENV_FILE
     return None
 
 
 def migrate_legacy_config(interactive: bool = True) -> bool:
-    """Мигрирует конфигурацию из старого расположения в XDG.
+    """Migrate configuration from legacy location to XDG.
 
     Args:
-        interactive: Если True, запрашивает подтверждение у пользователя.
+        interactive: If True, prompts user for confirmation.
 
     Returns:
-        True если миграция выполнена, False если нет.
+        True if migration was performed, False otherwise.
     """
     legacy_path = get_legacy_env_path()
 
@@ -97,10 +97,10 @@ def migrate_legacy_config(interactive: bool = True) -> bool:
 
 
 def load_config() -> dict[str, str]:
-    """Загружает конфигурацию из config.env файла.
+    """Load configuration from config.env file.
 
-    Автоматически проверяет наличие legacy конфигурации
-    и предлагает миграцию.
+    Automatically checks for legacy configuration
+    and offers migration.
     """
     # Пытаемся мигрировать legacy конфиг
     migrate_legacy_config(interactive=False)
@@ -119,7 +119,7 @@ def load_config() -> dict[str, str]:
 
 
 def save_config(env_vars: dict[str, str]) -> None:
-    """Сохраняет конфигурацию в config.env файл."""
+    """Save configuration to config.env file."""
     lines = [
         "# Advisor CLI Configuration",
         f"# Config location: {CONFIG_FILE}",
@@ -135,14 +135,14 @@ def save_config(env_vars: dict[str, str]) -> None:
 
 
 def mask_api_key(key: str) -> str:
-    """Маскирует API ключ для безопасного отображения."""
+    """Mask API key for safe display."""
     if not key or len(key) < 8:
         return "***"
     return key[:4] + "*" * (len(key) - 8) + key[-4:]
 
 
 def update_config(key: str, value: str) -> None:
-    """Обновляет одно значение в конфигурации.
+    """Update single value in configuration.
 
     Args:
         key: Environment variable name (e.g., "ADVISOR_DEFAULT_MODEL")
@@ -154,10 +154,10 @@ def update_config(key: str, value: str) -> None:
 
 
 def purge_config() -> bool:
-    """Удаляет файл конфигурации (секреты).
+    """Delete configuration file (secrets).
 
     Returns:
-        True если файл был удалён.
+        True if file was deleted.
     """
     if CONFIG_FILE.exists():
         CONFIG_FILE.unlink()
@@ -166,10 +166,10 @@ def purge_config() -> bool:
 
 
 def purge_cache() -> bool:
-    """Удаляет директорию кэша.
+    """Delete cache directory.
 
     Returns:
-        True если директория была удалена.
+        True if directory was deleted.
     """
     if CACHE_DIR.exists():
         shutil.rmtree(CACHE_DIR)
@@ -178,7 +178,7 @@ def purge_cache() -> bool:
 
 
 def purge_all() -> tuple[bool, bool]:
-    """Удаляет всю конфигурацию и кэш.
+    """Delete all configuration and cache.
 
     Returns:
         Tuple (config_removed, cache_removed).
