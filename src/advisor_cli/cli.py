@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """CLI интерфейс для advisor-cli."""
 
-import asyncio
 import json
 import sys
 import tempfile
@@ -37,6 +36,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+
 # Группа команд config
 config_app = typer.Typer(help="Управление конфигурацией")
 app.add_typer(config_app, name="config")
@@ -50,8 +50,8 @@ TASK_DIR = Path(tempfile.gettempdir()) / "advisor-tasks"
 TASK_TTL = 3600  # 1 час
 
 
-def create_async_task(task_id: str, result: dict):
-    """Сохранить результат во временный файл."""
+def create_async_task(task_id: str, result: dict) -> None:
+    """Save result to temporary file."""
     TASK_DIR.mkdir(exist_ok=True)
     task_file = TASK_DIR / f"{task_id}.json"
     task_file.write_text(
@@ -66,7 +66,7 @@ def create_async_task(task_id: str, result: dict):
 
 
 def get_async_result(task_id: str, keep: bool = False) -> dict | None:
-    """Получить результат, удалить файл если не keep."""
+    """Get result from temporary file, delete if not keep."""
     task_file = TASK_DIR / f"{task_id}.json"
     if not task_file.exists():
         return None
@@ -76,8 +76,8 @@ def get_async_result(task_id: str, keep: bool = False) -> dict | None:
     return data["result"]
 
 
-def cleanup_old_tasks():
-    """Удалить задачи старше TTL при запуске."""
+def cleanup_old_tasks() -> None:
+    """Delete tasks older than TTL on startup."""
     if not TASK_DIR.exists():
         return
     now = time.time()
@@ -90,8 +90,8 @@ def cleanup_old_tasks():
 
 
 # ===== Output =====
-def print_output(text: str, error: bool = False):
-    """Простой вывод в stdout/stderr."""
+def print_output(text: str, error: bool = False) -> None:
+    """Simple output to stdout/stderr."""
     if error:
         sys.stderr.write(text + "\n")
     else:
@@ -99,7 +99,7 @@ def print_output(text: str, error: bool = False):
 
 
 def _parse_format(format_str: str | None) -> ResponseFormat:
-    """Парсит строку формата в ResponseFormat enum.
+    """Parse format string to ResponseFormat enum.
 
     Args:
         format_str: "json", "markdown", or None
@@ -141,7 +141,7 @@ def ask(
     reasoning: Optional[str] = typer.Option(
         None, "--reasoning", "-r", help="Уровень reasoning: low|medium|high"
     ),
-):
+) -> None:
     """Получить ответ от LLM."""
     from .file_utils import build_context
 
@@ -164,7 +164,7 @@ def ask(
         reasoning=reasoning,
     )
 
-    result = asyncio.run(consult_expert(params))
+    result = run_async(consult_expert(params))
     print_output(result)
 
 
@@ -185,7 +185,7 @@ def compare(
         None, "--reasoning", "-r", help="Уровень reasoning: low|medium|high"
     ),
     background: bool = typer.Option(False, "--async", help="Запустить в фоне"),
-):
+) -> None:
     """Получить ответы от нескольких LLM (консилиум)."""
     from .file_utils import build_context
 
@@ -248,7 +248,7 @@ task_file.write_text(json.dumps({{"result": result, "created": time.time()}}, en
         print_output(f"Task ID: {task_id}")
         print_output(f"Получить результат: advisor result {task_id}")
     else:
-        result = asyncio.run(compare_experts(params))
+        result = run_async(compare_experts(params))
         print_output(result)
 
 
@@ -256,7 +256,7 @@ task_file.write_text(json.dumps({{"result": result, "created": time.time()}}, en
 def result(
     task_id: str = typer.Argument(..., help="ID задачи"),
     keep: bool = typer.Option(False, "--keep", help="Не удалять после прочтения"),
-):
+) -> None:
     """Получить результат фоновой задачи."""
     res = get_async_result(task_id, keep=keep)
     if res is None:
@@ -266,7 +266,7 @@ def result(
 
 
 @app.command()
-def run():
+def run() -> None:
     """Запустить MCP сервер (требует установки с [mcp])."""
     try:
         from .server import main as run_server
@@ -291,7 +291,7 @@ def setup(
     model: Optional[str] = typer.Option(
         None, "-m", "--model", help="Модель по умолчанию"
     ),
-):
+) -> None:
     """Интерактивная настройка конфигурации (требует установки с [wizard])."""
     from .setup_wizard import run_setup
 
@@ -307,7 +307,7 @@ def setup(
 
 
 @app.command()
-def status():
+def status() -> None:
     """Показать текущий статус конфигурации."""
     init_cache()
     from .core import CACHE_ACTIVE
@@ -328,7 +328,7 @@ def status():
 
 
 @app.command("models")
-def models_cmd():
+def models_cmd() -> None:
     """Показать настроенные модели и текущую конфигурацию."""
     print_output("\nТекущая конфигурация моделей\n")
     print_output(f"Single (ask): {DEFAULT_MODEL}")
@@ -365,7 +365,7 @@ def config_single(
     check: bool = typer.Option(
         True, "--check/--no-check", help="Проверить доступность модели"
     ),
-):
+) -> None:
     """Установить модель для ask (одиночный запрос)."""
     if "/" not in model:
         print_output("Ошибка: Формат модели: provider/model", error=True)
@@ -376,7 +376,7 @@ def config_single(
         try:
             from .setup_wizard import test_model
 
-            success, msg = asyncio.run(test_model(model))
+            success, msg = run_async(test_model(model))
             if not success:
                 print_output(f"Ошибка: {msg}", error=True)
                 raise typer.Exit(1)
@@ -399,7 +399,7 @@ def config_compare(
     check: bool = typer.Option(
         True, "--check/--no-check", help="Проверить доступность моделей"
     ),
-):
+) -> None:
     """Установить модели для compare (консилиум)."""
     model_list = [m.strip() for m in models_str.split(",") if m.strip()]
 
@@ -419,7 +419,7 @@ def config_compare(
                     continue
 
                 print_output(f"Проверка {model}...")
-                success, msg = asyncio.run(test_model(model))
+                success, msg = run_async(test_model(model))
 
                 if success:
                     print_output(f"  {model}: OK")
@@ -441,7 +441,7 @@ def config_compare(
 @config_app.command("format")
 def config_format(
     fmt: str = typer.Argument(..., help="Формат по умолчанию: markdown|json"),
-):
+) -> None:
     """Установить формат вывода по умолчанию."""
     if fmt.lower() not in ("markdown", "json"):
         print_output("Ошибка: Формат должен быть markdown или json", error=True)
@@ -454,7 +454,7 @@ def config_format(
 
 
 @config_app.command("show")
-def config_show():
+def config_show() -> None:
     """Показать текущую конфигурацию и расположение файлов."""
     from .config import CACHE_DIR, CONFIG_FILE, load_config, mask_api_key
 
@@ -507,7 +507,7 @@ def config_show():
 @config_app.command("purge")
 def config_purge(
     force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
-):
+) -> None:
     """Удалить файл конфигурации (API ключи)."""
     from .config import CONFIG_FILE, purge_config
 
@@ -540,7 +540,7 @@ def config_purge(
 @app.command()
 def uninstall(
     force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
-):
+) -> None:
     """Удалить все данные advisor-cli (конфиг + кэш)."""
     from .config import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, purge_all
 
@@ -599,7 +599,7 @@ def mcp_install(
         False, "--force", "-f", help="Перезаписать без вопросов"
     ),
     yes: bool = typer.Option(False, "-y", help="Неинтерактивный режим"),
-):
+) -> None:
     """Установить MCP интеграцию для Claude."""
     from .mcp_manager import (
         ConflictType,
@@ -742,7 +742,7 @@ def mcp_uninstall(
     ),
     all_scopes: bool = typer.Option(False, "--all", "-a", help="Удалить отовсюду"),
     yes: bool = typer.Option(False, "-y", help="Неинтерактивный режим"),
-):
+) -> None:
     """Удалить MCP интеграцию из Claude."""
     from .mcp_manager import (
         Scope,
@@ -823,7 +823,7 @@ def mcp_uninstall(
 
 
 @mcp_app.command("status")
-def mcp_status():
+def mcp_status() -> None:
     """Показать статус MCP интеграции."""
     from .mcp_manager import get_installation_status
 
