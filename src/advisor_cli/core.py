@@ -484,6 +484,24 @@ class CompareExpertsInput(BaseModel):
 
 
 # ===== Core Functions =====
+def _build_messages(query: str, context: str | None, role: str) -> list[dict]:
+    """Создаёт список сообщений для LLM запроса.
+
+    Args:
+        query: User query
+        context: Optional context
+        role: System role
+
+    Returns:
+        List of message dicts for litellm
+    """
+    user_content = f"{query}\n\nКонтекст:\n{context}" if context else query
+    return [
+        {"role": "system", "content": role},
+        {"role": "user", "content": user_content},
+    ]
+
+
 async def consult_expert(params: ConsultExpertInput) -> str:
     """Консультируется с экспертной LLM моделью."""
     if not params.model:
@@ -493,15 +511,7 @@ async def consult_expert(params: ConsultExpertInput) -> str:
     if error:
         return f"Ошибка: {error}"
 
-    messages = [
-        {"role": "system", "content": params.role},
-        {
-            "role": "user",
-            "content": f"{params.query}\n\nКонтекст:\n{params.context}"
-            if params.context
-            else params.query,
-        },
-    ]
+    messages = _build_messages(params.query, params.context, params.role)
 
     try:
         response, reasoning_content = await completion_with_auto_detect(
@@ -541,15 +551,7 @@ async def compare_experts(params: CompareExpertsInput) -> str:
     if not model_list:
         return f"Ошибка: Список моделей пуст. {get_enabled_models_hint()}"
 
-    messages = [
-        {"role": "system", "content": params.role},
-        {
-            "role": "user",
-            "content": f"{params.query}\n\nКонтекст:\n{params.context}"
-            if params.context
-            else params.query,
-        },
-    ]
+    messages = _build_messages(params.query, params.context, params.role)
 
     async def ask_model(model: str) -> tuple[str, str, Optional[str], bool]:
         error = check_model_allowed(model)
