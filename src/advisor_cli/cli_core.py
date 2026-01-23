@@ -11,6 +11,7 @@ These commands are the primary interface for interacting with LLMs.
 """
 
 import json
+import logging
 import subprocess
 import sys
 import uuid
@@ -19,7 +20,12 @@ from typing import Optional
 
 import typer
 
-from .cli_async import TASK_DIR, cleanup_old_tasks, get_async_result
+from .cli_async import (
+    TASK_ID_LENGTH,
+    TaskStatus,
+    cleanup_old_tasks,
+    get_async_result,
+)
 from .cli_output import _parse_format, print_output
 from .core import (
     CUSTOM_PROVIDERS,
@@ -32,28 +38,47 @@ from .core import (
     consult_expert,
     init_cache,
 )
+from .task_runner import update_task_status
 from .utils import run_async
 
-# Length of truncated task ID for async operations
-TASK_ID_LENGTH = 8
+logger = logging.getLogger(__name__)
 
 # Typer app for core commands
 core_app = typer.Typer()
 
 
-def _run_background_task(cmd: list[str]) -> None:
-    """Run a command in the background as a detached process.
+def _run_background_task(
+    task_id: str,
+    task_type: str,
+    params: dict,
+) -> bool:
+    """Run a task in the background using task_runner.
 
-    Uses subprocess.Popen with start_new_session to fully detach the process.
-    Output is redirected to DEVNULL.
+    Creates a pending task, then spawns a subprocess running task_runner.
+    The subprocess handles timeout and status updates.
 
     Args:
-        cmd: Command and arguments to execute
+        task_id: Unique task identifier
+        task_type: Type of task ("compare" or "ask")
+        params: Task parameters as a dictionary
 
-    Note:
-        Silently handles OSError (e.g., command not found) to prevent
-        crashes when the Python executable path is invalid.
+    Returns:
+        True if subprocess started successfully, False otherwise
     """
+    # Create pending task
+    update_task_status(task_id, TaskStatus.PENDING)
+
+    # Build command
+    params_json = json.dumps(params, ensure_ascii=False)
+    cmd = [
+        sys.executable,
+        "-m",
+        "advisor_cli.task_runner",
+        task_id,
+        task_type,
+        params_json,
+    ]
+
     try:
         subprocess.Popen(
             cmd,
@@ -61,10 +86,17 @@ def _run_background_task(cmd: list[str]) -> None:
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-    except OSError:
-        # Handle cases where subprocess cannot be started
-        # (e.g., invalid executable path, permission denied)
-        pass
+        logger.info(f"Started background task {task_id} ({task_type})")
+        return True
+    except OSError as e:
+        # Update task status to failed
+        update_task_status(
+            task_id,
+            TaskStatus.FAILED,
+            error=f"Failed to start subprocess: {e}",
+        )
+        logger.error(f"Failed to start background task {task_id}: {e}")
+        return False
 
 
 @core_app.command()
@@ -150,36 +182,22 @@ def compare(
 
     if background:
         task_id = str(uuid.uuid4())[:TASK_ID_LENGTH]
-        # Run in background via subprocess
-        cmd = [
-            sys.executable,
-            "-c",
-            f"""
-import asyncio
-import json
-from advisor_cli.core import CompareExpertsInput, ResponseFormat, compare_experts, init_cache
-
-init_cache()
-params = CompareExpertsInput(
-    query={repr(query)},
-    context={repr(final_context)},
-    models={repr(models or DEFAULT_MODELS_COMPARE)},
-    response_format=ResponseFormat.{response_format.name},
-    reasoning={repr(reasoning)},
-)
-result = asyncio.run(compare_experts(params))
-
-from pathlib import Path
-import time
-TASK_DIR = Path({repr(str(TASK_DIR))})
-TASK_DIR.mkdir(exist_ok=True)
-task_file = TASK_DIR / "{task_id}.json"
-task_file.write_text(json.dumps({{"result": result, "created": time.time()}}, ensure_ascii=False))
-""",
-        ]
-        _run_background_task(cmd)
-        print_output(f"Task ID: {task_id}")
-        print_output(f"Получить результат: advisor result {task_id}")
+        # Run in background via task_runner with timeout
+        task_params = {
+            "query": query,
+            "context": final_context,
+            "models": models or DEFAULT_MODELS_COMPARE,
+            "response_format": response_format.name,
+            "reasoning": reasoning,
+        }
+        success = _run_background_task(task_id, "compare", task_params)
+        if success:
+            print_output(f"Task ID: {task_id}")
+            print_output(f"Получить результат: advisor result {task_id}")
+            print_output(f"Проверить статус: advisor result {task_id} --keep")
+        else:
+            print_output("Не удалось запустить фоновую задачу", error=True)
+            raise typer.Exit(1)
     else:
         result = run_async(compare_experts(params))
         print_output(result)
@@ -190,11 +208,48 @@ def result(
     task_id: str = typer.Argument(..., help="ID задачи"),
     keep: bool = typer.Option(False, "--keep", help="Не удалять после прочтения"),
 ) -> None:
-    """Получить результат фоновой задачи."""
-    res = get_async_result(task_id, keep=keep)
-    if res is None:
+    """Получить результат фоновой задачи.
+
+    Если задача ещё выполняется, показывает текущий статус.
+    С флагом --keep можно проверять статус без удаления файла.
+    """
+    from .cli_async import get_task_status
+
+    # First check task status
+    task_data = get_task_status(task_id)
+    if task_data is None:
         print_output(f"Задача не найдена: {task_id}", error=True)
         raise typer.Exit(1)
+
+    status = task_data.get("status")
+
+    # Show status for pending/running tasks
+    if status == TaskStatus.PENDING:
+        print_output(f"Задача {task_id}: ожидает запуска")
+        raise typer.Exit(0)
+    elif status == TaskStatus.RUNNING:
+        print_output(f"Задача {task_id}: выполняется...")
+        raise typer.Exit(0)
+    elif status == TaskStatus.TIMEOUT:
+        error = task_data.get("error", "Превышено время ожидания")
+        print_output(f"Задача {task_id}: таймаут - {error}", error=True)
+        if not keep:
+            # Clean up the task file
+            get_async_result(task_id, keep=False)
+        raise typer.Exit(1)
+    elif status == TaskStatus.FAILED:
+        error = task_data.get("error", "Неизвестная ошибка")
+        print_output(f"Задача {task_id}: ошибка - {error}", error=True)
+        if not keep:
+            get_async_result(task_id, keep=False)
+        raise typer.Exit(1)
+
+    # For completed tasks, get the result
+    res = get_async_result(task_id, keep=keep)
+    if res is None:
+        print_output(f"Результат задачи {task_id} не найден", error=True)
+        raise typer.Exit(1)
+
     print_output(json.dumps(res, ensure_ascii=False, indent=2))
 
 
