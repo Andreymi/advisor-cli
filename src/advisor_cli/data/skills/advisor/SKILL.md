@@ -53,22 +53,22 @@ Get alternative perspectives from other LLMs.
 ❌ Vague: "Review this", "Is this good?"
 
 ✅ Specific:
-- "Найди уязвимости: инъекции, auth bypass, утечка данных"
-- "O(n²) приемлемо для N=10k или оптимизировать?"
-- "Redis vs Memcached для 100 req/hour, 1MB values?"
-- "Какие edge cases я пропустил в error handling?"
+- "Find vulnerabilities: injection, auth bypass, data exposure"
+- "Is O(n²) acceptable for N=10k or should I optimize?"
+- "Redis vs Memcached for 100 req/hour, 1MB values?"
+- "What edge cases am I missing in this error handling?"
 
 ## Task Templates
 
 | Domain | Query Template |
 |--------|----------------|
-| Security | "Найди уязвимости: инъекции, обход авторизации, утечка данных" |
-| Code review | "Оцени: читаемость, edge cases, баги, тестируемость" |
-| Architecture | "Оцени масштабируемость для X users / Y RPS" |
-| Performance | "Найди узкие места. N=..., частота: ..." |
-| API design | "Оцени консистентность и удобство API" |
-| Data modeling | "Оцени схему: нормализация, индексы, связи" |
-| Tech decision | "Сравни A vs B для MVP с учётом time-to-market" |
+| Security | "Find vulnerabilities: injection, auth bypass, data exposure" |
+| Code review | "Evaluate: readability, edge cases, bugs, testability" |
+| Architecture | "Evaluate scalability for X users / Y RPS" |
+| Performance | "Find bottlenecks. N=..., frequency: ..." |
+| API design | "Evaluate API consistency and usability" |
+| Data modeling | "Evaluate schema: normalization, indexes, relations" |
+| Tech decision | "Compare A vs B for MVP considering time-to-market" |
 
 ## Expert Roles
 
@@ -76,10 +76,10 @@ Set `role` for specialized answers:
 
 | Domain | Role |
 |--------|------|
-| Security | "Ты Senior Security Engineer. Думай как атакующий." |
-| Architecture | "Ты Solution Architect. Фокус на масштабируемости." |
-| Performance | "Ты Performance Engineer. Ищи bottlenecks." |
-| Code quality | "Ты Staff Engineer. Оцени maintainability." |
+| Security | "You are a Senior Security Engineer. Think like an attacker." |
+| Architecture | "You are a Solution Architect. Focus on scalability." |
+| Performance | "You are a Performance Engineer. Find bottlenecks." |
+| Code quality | "You are a Staff Engineer. Evaluate maintainability." |
 
 ## Models
 
