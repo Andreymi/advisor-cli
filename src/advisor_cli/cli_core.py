@@ -25,6 +25,7 @@ from .cli_async import (
     TaskStatus,
     cleanup_old_tasks,
     get_async_result,
+    update_task_status,
 )
 from .cli_output import _parse_format, print_output
 from .core import (
@@ -38,7 +39,6 @@ from .core import (
     consult_expert,
     init_cache,
 )
-from .task_runner import update_task_status
 from .utils import run_async
 
 logger = logging.getLogger(__name__)

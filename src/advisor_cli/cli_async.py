@@ -35,33 +35,50 @@ class TaskStatus:
     TIMEOUT = "timeout"
 
 
-def create_async_task(task_id: str, result: dict) -> None:
-    """Save async task result to a temporary file.
+def update_task_status(
+    task_id: str,
+    status: str,
+    result: Any = None,
+    error: str | None = None,
+) -> None:
+    """Update task status in the task file.
 
-    Creates a JSON file containing the result and creation timestamp.
-    The task directory is created if it doesn't exist.
+    This is the primary function for managing task state. Creates or updates
+    a JSON file with the task status and associated data.
 
     Args:
-        task_id: Unique identifier for the task
-        result: Dictionary containing the task result to store
-
-    Note:
-        This is a legacy function for backward compatibility.
-        New code should use task_runner.update_task_status().
+        task_id: Unique task identifier
+        status: One of TaskStatus constants
+        result: Task result (for completed tasks)
+        error: Error message (for failed/timeout tasks)
     """
     TASK_DIR.mkdir(exist_ok=True)
     task_file = TASK_DIR / f"{task_id}.json"
-    task_file.write_text(
-        json.dumps(
-            {
-                "status": TaskStatus.COMPLETED,
-                "result": result,
-                "created": time.time(),
-                "completed": time.time(),
-            },
-            ensure_ascii=False,
-        )
-    )
+
+    data: dict[str, Any] = {
+        "status": status,
+        "updated": time.time(),
+    }
+
+    if status == TaskStatus.PENDING:
+        data["created"] = time.time()
+    elif status == TaskStatus.COMPLETED:
+        data["result"] = result
+        data["completed"] = time.time()
+    elif status in (TaskStatus.FAILED, TaskStatus.TIMEOUT):
+        data["error"] = error
+        data["completed"] = time.time()
+
+    # Merge with existing data if present (preserves created timestamp)
+    if task_file.exists():
+        try:
+            existing = json.loads(task_file.read_text())
+            existing.update(data)
+            data = existing
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    task_file.write_text(json.dumps(data, ensure_ascii=False))
 
 
 def get_task_status(task_id: str) -> dict[str, Any] | None:

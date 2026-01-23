@@ -1,17 +1,16 @@
-"""Tests for task_runner module - background task execution with timeout."""
+"""Tests for task management - cli_async and task_runner modules."""
 
 import json
 import time
-from pathlib import Path
 from unittest.mock import patch
 
-
-from advisor_cli.task_runner import (
-    DEFAULT_TIMEOUT_SECONDS,
+from advisor_cli.cli_async import (
+    TASK_DIR,
+    TASK_ID_LENGTH,
     TaskStatus,
-    get_task_dir,
     update_task_status,
 )
+from advisor_cli.task_runner import DEFAULT_TIMEOUT_SECONDS
 
 
 class TestTaskStatusConstants:
@@ -38,26 +37,20 @@ class TestTaskStatusConstants:
         assert TaskStatus.TIMEOUT == "timeout"
 
 
-class TestDefaultTimeout:
-    """Tests for default timeout constant."""
+class TestTaskConstants:
+    """Tests for task-related constants."""
 
     def test_default_timeout_is_5_minutes(self):
         """DEFAULT_TIMEOUT_SECONDS should be 300 (5 minutes)."""
         assert DEFAULT_TIMEOUT_SECONDS == 300
 
+    def test_task_id_length_is_8(self):
+        """TASK_ID_LENGTH should be 8."""
+        assert TASK_ID_LENGTH == 8
 
-class TestGetTaskDir:
-    """Tests for get_task_dir function."""
-
-    def test_returns_path_object(self):
-        """get_task_dir should return a Path object."""
-        result = get_task_dir()
-        assert isinstance(result, Path)
-
-    def test_contains_advisor_tasks(self):
-        """get_task_dir should return path containing 'advisor-tasks'."""
-        result = get_task_dir()
-        assert "advisor-tasks" in str(result)
+    def test_task_dir_contains_advisor_tasks(self):
+        """TASK_DIR should contain 'advisor-tasks'."""
+        assert "advisor-tasks" in str(TASK_DIR)
 
 
 class TestUpdateTaskStatus:
@@ -65,7 +58,7 @@ class TestUpdateTaskStatus:
 
     def test_create_pending_task(self, tmp_path):
         """update_task_status should create pending task with created timestamp."""
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=tmp_path):
+        with patch("advisor_cli.cli_async.TASK_DIR", tmp_path):
             update_task_status("task-1", TaskStatus.PENDING)
 
             task_file = tmp_path / "task-1.json"
@@ -78,7 +71,7 @@ class TestUpdateTaskStatus:
 
     def test_update_to_running(self, tmp_path):
         """update_task_status should update status to running."""
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=tmp_path):
+        with patch("advisor_cli.cli_async.TASK_DIR", tmp_path):
             update_task_status("task-2", TaskStatus.PENDING)
             update_task_status("task-2", TaskStatus.RUNNING)
 
@@ -90,7 +83,7 @@ class TestUpdateTaskStatus:
 
     def test_complete_with_result(self, tmp_path):
         """update_task_status should store result for completed tasks."""
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=tmp_path):
+        with patch("advisor_cli.cli_async.TASK_DIR", tmp_path):
             result_data = {"answer": "42", "model": "gpt-4"}
             update_task_status("task-3", TaskStatus.COMPLETED, result=result_data)
 
@@ -102,7 +95,7 @@ class TestUpdateTaskStatus:
 
     def test_failed_with_error(self, tmp_path):
         """update_task_status should store error for failed tasks."""
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=tmp_path):
+        with patch("advisor_cli.cli_async.TASK_DIR", tmp_path):
             update_task_status("task-4", TaskStatus.FAILED, error="Connection timeout")
 
             task_file = tmp_path / "task-4.json"
@@ -113,7 +106,7 @@ class TestUpdateTaskStatus:
 
     def test_timeout_with_error(self, tmp_path):
         """update_task_status should store error for timeout tasks."""
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=tmp_path):
+        with patch("advisor_cli.cli_async.TASK_DIR", tmp_path):
             update_task_status(
                 "task-5", TaskStatus.TIMEOUT, error="Task timed out after 300s"
             )
@@ -126,14 +119,14 @@ class TestUpdateTaskStatus:
     def test_creates_directory_if_missing(self, tmp_path):
         """update_task_status should create task directory if it doesn't exist."""
         task_dir = tmp_path / "new-dir"
-        with patch("advisor_cli.task_runner.get_task_dir", return_value=task_dir):
+        with patch("advisor_cli.cli_async.TASK_DIR", task_dir):
             assert not task_dir.exists()
             update_task_status("task-6", TaskStatus.PENDING)
             assert task_dir.exists()
 
 
 class TestCliAsyncStatusIntegration:
-    """Tests for cli_async integration with new status system."""
+    """Tests for cli_async integration with status system."""
 
     def test_get_task_status_returns_data(self, tmp_path):
         """get_task_status should return task data dict."""
@@ -194,9 +187,3 @@ class TestCliAsyncStatusIntegration:
             assert result is not None
             assert result["status"] == "failed"
             assert result["error"] == "Test error"
-
-    def test_task_id_length_constant(self):
-        """TASK_ID_LENGTH should be 8."""
-        from advisor_cli.cli_async import TASK_ID_LENGTH
-
-        assert TASK_ID_LENGTH == 8

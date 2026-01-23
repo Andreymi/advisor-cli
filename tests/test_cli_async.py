@@ -5,13 +5,13 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-
 from advisor_cli.cli_async import (
     TASK_DIR,
     TASK_TTL_SECONDS,
+    TaskStatus,
     cleanup_old_tasks,
-    create_async_task,
     get_async_result,
+    update_task_status,
 )
 
 
@@ -27,8 +27,8 @@ class TestAsyncTaskConstants:
         assert "advisor-tasks" in str(TASK_DIR)
 
 
-class TestCreateAsyncTask:
-    """Tests for create_async_task function."""
+class TestUpdateTaskStatus:
+    """Tests for update_task_status function."""
 
     def test_create_and_get_task(self, tmp_path):
         """Create a task and retrieve it."""
@@ -36,7 +36,7 @@ class TestCreateAsyncTask:
             task_id = "test-task-123"
             result = {"model": "gpt-4", "response": "Hello world"}
 
-            create_async_task(task_id, result)
+            update_task_status(task_id, TaskStatus.COMPLETED, result=result)
 
             # Verify file was created
             task_file = tmp_path / f"{task_id}.json"
@@ -45,17 +45,17 @@ class TestCreateAsyncTask:
             # Verify content structure
             data = json.loads(task_file.read_text())
             assert "result" in data
-            assert "created" in data
+            assert "status" in data
             assert data["result"] == result
-            assert isinstance(data["created"], float)
+            assert data["status"] == "completed"
 
     def test_create_task_creates_directory(self, tmp_path):
-        """create_async_task should create TASK_DIR if it doesn't exist."""
+        """update_task_status should create TASK_DIR if it doesn't exist."""
         task_dir = tmp_path / "new-dir"
         with patch("advisor_cli.cli_async.TASK_DIR", task_dir):
             assert not task_dir.exists()
 
-            create_async_task("task-1", {"data": "test"})
+            update_task_status("task-1", TaskStatus.PENDING)
 
             assert task_dir.exists()
 
@@ -69,7 +69,7 @@ class TestGetAsyncResult:
             task_id = "delete-test"
             result = {"key": "value"}
 
-            create_async_task(task_id, result)
+            update_task_status(task_id, TaskStatus.COMPLETED, result=result)
             task_file = tmp_path / f"{task_id}.json"
             assert task_file.exists()
 
@@ -83,7 +83,7 @@ class TestGetAsyncResult:
             task_id = "keep-test"
             result = {"preserved": True}
 
-            create_async_task(task_id, result)
+            update_task_status(task_id, TaskStatus.COMPLETED, result=result)
             task_file = tmp_path / f"{task_id}.json"
 
             retrieved = get_async_result(task_id, keep=True)
