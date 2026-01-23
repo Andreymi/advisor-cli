@@ -10,7 +10,14 @@
 ## Project Structure
 ```
 src/advisor_cli/
-├── cli.py              — CLI interface (commands)
+├── cli.py              — CLI entry point (94 lines)
+├── cli_async.py        — Async task utilities (TASK_TTL, create/get tasks)
+├── cli_output.py       — Output helpers (print_output, _parse_format)
+├── cli_core.py         — Core commands (ask, compare, result, status, models)
+├── cli_config.py       — Config commands (single, compare, format, show, purge)
+├── cli_mcp.py          — MCP commands (install, uninstall, status)
+├── cli_skill.py        — Skill commands (install, uninstall, status)
+├── cli_install.py      — Unified install/uninstall commands
 ├── core.py             — LLM logic (no MCP dependency)
 ├── config.py           — XDG config management
 ├── server.py           — MCP server (optional)
