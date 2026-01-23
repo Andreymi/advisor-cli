@@ -45,6 +45,10 @@ app.add_typer(config_app, name="config")
 mcp_app = typer.Typer(help="Управление MCP интеграцией")
 app.add_typer(mcp_app, name="mcp")
 
+# Группа команд skill
+skill_app = typer.Typer(help="Управление Claude Code skill")
+app.add_typer(skill_app, name="skill")
+
 # ===== Async Tasks =====
 TASK_DIR = Path(tempfile.gettempdir()) / "advisor-tasks"
 TASK_TTL = 3600  # 1 час
@@ -854,6 +858,98 @@ def mcp_status() -> None:
         print_output("\nЗапустите: advisor mcp install")
     elif any(s.get("outdated") for s in status.values()):
         print_output("\nДля обновления: advisor mcp install --force")
+
+    print_output("")
+
+
+# ===== Skill Commands =====
+
+
+@skill_app.command("install")
+def skill_install(
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Перезаписать существующий"
+    ),
+) -> None:
+    """Установить advisor skill для Claude Code."""
+    from .skill_manager import install_skill
+
+    success, message = install_skill(force=force)
+
+    if not success:
+        print_output(f"Ошибка: {message}", error=True)
+        if "уже установлен" not in message:
+            raise typer.Exit(1)
+        return
+
+    print_output(f"✓ Skill установлен: {message}")
+    print_output("\nИспользование в Claude Code:")
+    print_output("  /advisor <query>")
+    print_output("  или: @advisor в чате")
+
+
+@skill_app.command("uninstall")
+def skill_uninstall(
+    force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
+) -> None:
+    """Удалить advisor skill из Claude Code."""
+    from .skill_manager import get_skill_status, uninstall_skill
+
+    status = get_skill_status()
+
+    if not status.is_installed:
+        print_output("Skill не установлен.")
+        return
+
+    if not force:
+        try:
+            import questionary
+
+            confirm = questionary.confirm(
+                f"Удалить {status.installed_path}?",
+                default=False,
+            ).ask()
+            if not confirm:
+                print_output("Отменено.")
+                return
+        except ImportError:
+            print_output("Используйте --force для подтверждения", error=True)
+            raise typer.Exit(1)
+
+    success, message = uninstall_skill()
+    if success:
+        print_output(f"✓ {message}")
+    else:
+        print_output(message, error=True)
+
+
+@skill_app.command("status")
+def skill_status() -> None:
+    """Показать статус установки skill."""
+    from .skill_manager import get_skill_status
+
+    status = get_skill_status()
+
+    print_output("\nAdvisor Skill Status\n")
+
+    # Package skill
+    if status.package_path:
+        print_output(f"  Package: ✓ {status.package_path}")
+    else:
+        print_output("  Package: ✗ не найден (переустановите advisor-cli)")
+
+    # Installed skill
+    if status.is_installed:
+        print_output(f"  Installed: ✓ {status.installed_path}")
+
+        if status.is_outdated:
+            print_output("  Status: ⚠ устаревшая версия")
+            print_output("\n  Обновите: advisor skill install --force")
+        else:
+            print_output("  Status: ✓ актуальная версия")
+    else:
+        print_output("  Installed: ✗ не установлен")
+        print_output("\n  Установите: advisor skill install")
 
     print_output("")
 
