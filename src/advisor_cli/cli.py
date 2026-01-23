@@ -20,10 +20,12 @@ from typing import Optional
 
 import typer
 
+
 # Suppress warnings from litellm/pydantic before importing
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", message="coroutine .* was never awaited")
 
+from . import __version__  # noqa: E402
 from .cli_config import config_app  # noqa: E402
 from .cli_core import core_app  # noqa: E402
 from .cli_install import install_app  # noqa: E402
@@ -32,12 +34,36 @@ from .cli_output import print_output  # noqa: E402
 from .cli_skill import skill_app  # noqa: E402
 from .utils import require_wizard  # noqa: E402
 
+
+def version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        print(f"advisor-cli {__version__}")
+        raise typer.Exit()
+
+
 # Main application
 app = typer.Typer(
     name="advisor",
     help="CLI for getting second opinions from alternative LLMs",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+
+@app.callback()
+def main(
+    _version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+) -> None:
+    """Advisor CLI - get second opinions from alternative LLMs."""
+
 
 # Register sub-apps
 app.add_typer(config_app, name="config")
