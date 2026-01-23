@@ -867,35 +867,55 @@ def mcp_status() -> None:
 
 @skill_app.command("install")
 def skill_install(
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope: project или user"
+    ),
     force: bool = typer.Option(
         False, "--force", "-f", help="Перезаписать существующий"
     ),
 ) -> None:
     """Установить advisor skill для Claude Code."""
-    from .skill_manager import install_skill
+    from .skill_manager import Scope, has_project_skill, install_skill
 
-    success, message = install_skill(force=force)
+    # Determine scope
+    if scope:
+        scope_enum = Scope.PROJECT if scope == "project" else Scope.USER
+    elif has_project_skill():
+        scope_enum = Scope.PROJECT
+    else:
+        scope_enum = Scope.USER
+
+    success, message = install_skill(scope=scope_enum, force=force)
 
     if not success:
         print_output(f"Ошибка: {message}", error=True)
-        if "уже установлен" not in message:
+        if "already installed" not in message:
             raise typer.Exit(1)
         return
 
-    print_output(f"✓ Skill установлен: {message}")
+    loc = "project (.claude/)" if scope_enum == Scope.PROJECT else "user (~/.claude/)"
+    print_output(f"✓ Skill установлен ({loc}): {message}")
     print_output("\nИспользование в Claude Code:")
     print_output("  /advisor <query>")
-    print_output("  или: @advisor в чате")
 
 
 @skill_app.command("uninstall")
 def skill_uninstall(
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope: project или user"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
 ) -> None:
     """Удалить advisor skill из Claude Code."""
-    from .skill_manager import get_skill_status, uninstall_skill
+    from .skill_manager import Scope, get_skill_status, uninstall_skill
 
-    status = get_skill_status()
+    # Determine scope
+    if scope:
+        scope_enum = Scope.PROJECT if scope == "project" else Scope.USER
+        status = get_skill_status(scope_enum)
+    else:
+        status = get_skill_status()
+        scope_enum = status.scope or Scope.USER
 
     if not status.is_installed:
         print_output("Skill не установлен.")
@@ -916,7 +936,7 @@ def skill_uninstall(
             print_output("Используйте --force для подтверждения", error=True)
             raise typer.Exit(1)
 
-    success, message = uninstall_skill()
+    success, message = uninstall_skill(scope_enum)
     if success:
         print_output(f"✓ {message}")
     else:
@@ -926,32 +946,156 @@ def skill_uninstall(
 @skill_app.command("status")
 def skill_status() -> None:
     """Показать статус установки skill."""
-    from .skill_manager import get_skill_status
-
-    status = get_skill_status()
+    from .skill_manager import Scope, get_skill_status
 
     print_output("\nAdvisor Skill Status\n")
 
-    # Package skill
+    # Package
+    status = get_skill_status()
     if status.package_path:
         print_output(f"  Package: ✓ {status.package_path}")
     else:
         print_output("  Package: ✗ не найден (переустановите advisor-cli)")
 
-    # Installed skill
-    if status.is_installed:
-        print_output(f"  Installed: ✓ {status.installed_path}")
-
-        if status.is_outdated:
-            print_output("  Status: ⚠ устаревшая версия")
-            print_output("\n  Обновите: advisor skill install --force")
-        else:
-            print_output("  Status: ✓ актуальная версия")
-    else:
-        print_output("  Installed: ✗ не установлен")
-        print_output("\n  Установите: advisor skill install")
+    # Check both scopes
+    project_status = get_skill_status(Scope.PROJECT)
+    user_status = get_skill_status(Scope.USER)
 
     print_output("")
+    # Project
+    if project_status.is_installed:
+        mark = "⚠ outdated" if project_status.is_outdated else "✓"
+        print_output(f"  Project: {mark} {project_status.installed_path}")
+    else:
+        print_output("  Project: ✗ не установлен")
+
+    # User
+    if user_status.is_installed:
+        mark = "⚠ outdated" if user_status.is_outdated else "✓"
+        print_output(f"  User:    {mark} {user_status.installed_path}")
+    else:
+        print_output("  User:    ✗ не установлен")
+
+    if not project_status.is_installed and not user_status.is_installed:
+        print_output("\n  Установите: advisor install")
+    elif project_status.is_outdated or user_status.is_outdated:
+        print_output("\n  Обновите: advisor skill install --force")
+
+    print_output("")
+
+
+# ===== Unified Install Command =====
+
+
+@app.command()
+def install(
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope: project или user"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Перезаписать существующее"
+    ),
+    yes: bool = typer.Option(False, "-y", help="Неинтерактивный режим"),
+) -> None:
+    """Установить MCP интеграцию и Skill для Claude Code."""
+    from .mcp_manager import Scope as McpScope
+    from .mcp_manager import has_project_mcp_config, install_to_claude_code
+    from .skill_manager import Scope as SkillScope
+    from .skill_manager import install_skill
+
+    # Check if providers configured
+    try:
+        from .config import load_config
+
+        env = load_config()
+    except ImportError:
+        env = {}
+
+    has_providers = any(
+        env.get(key)
+        for key in [
+            "GEMINI_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "GROQ_API_KEY",
+            "OPENROUTER_API_KEY",
+        ]
+    )
+
+    if not has_providers:
+        print_output("Нет настроенных провайдеров.")
+        if yes:
+            print_output("Запустите: advisor setup", error=True)
+            raise typer.Exit(1)
+        try:
+            import questionary
+
+            run_setup_q = questionary.confirm(
+                "Запустить настройку?", default=True
+            ).ask()
+            if run_setup_q:
+                from .setup_wizard import run_setup
+
+                run_setup()
+            else:
+                raise typer.Exit(1)
+        except ImportError:
+            print_output("Запустите: advisor setup", error=True)
+            raise typer.Exit(1)
+
+    # Determine scope
+    if scope:
+        mcp_scope = McpScope.PROJECT if scope == "project" else McpScope.USER
+        skill_scope = SkillScope.PROJECT if scope == "project" else SkillScope.USER
+    elif has_project_mcp_config():
+        mcp_scope = McpScope.PROJECT
+        skill_scope = SkillScope.PROJECT
+        if not yes:
+            print_output("Обнаружен .mcp.json в текущем проекте.")
+    elif yes:
+        mcp_scope = McpScope.USER
+        skill_scope = SkillScope.USER
+    else:
+        try:
+            import questionary
+
+            choice = questionary.select(
+                "Куда установить?",
+                choices=[
+                    questionary.Choice(
+                        "В проект (только этот проект)", value="project"
+                    ),
+                    questionary.Choice("Глобально (все проекты)", value="user"),
+                ],
+            ).ask()
+            mcp_scope = McpScope.PROJECT if choice == "project" else McpScope.USER
+            skill_scope = SkillScope.PROJECT if choice == "project" else SkillScope.USER
+        except ImportError:
+            mcp_scope = McpScope.USER
+            skill_scope = SkillScope.USER
+
+    loc = "project" if mcp_scope == McpScope.PROJECT else "user"
+    print_output(f"\nУстановка в {loc}...\n")
+
+    # Install MCP
+    if install_to_claude_code(mcp_scope):
+        mcp_path = ".mcp.json" if mcp_scope == McpScope.PROJECT else "~/.claude.json"
+        print_output(f"✓ MCP установлен: {mcp_path}")
+    else:
+        print_output("✗ MCP не установлен", error=True)
+
+    # Install Skill
+    success, message = install_skill(scope=skill_scope, force=force)
+    if success:
+        print_output(f"✓ Skill установлен: {message}")
+    else:
+        if "already installed" in message and not force:
+            print_output("  Skill уже установлен (используйте --force для обновления)")
+        else:
+            print_output(f"✗ Skill: {message}", error=True)
+
+    print_output("\nПерезапустите Claude для применения изменений.")
 
 
 if __name__ == "__main__":
