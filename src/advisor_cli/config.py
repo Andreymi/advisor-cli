@@ -9,6 +9,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 # ===== XDG-совместимые пути =====
 
@@ -190,3 +191,92 @@ def purge_all() -> tuple[bool, bool]:
         CONFIG_DIR.rmdir()
 
     return config_removed, cache_removed
+
+
+# ===== Provider Configuration =====
+# Single source of truth for provider information
+
+PROVIDER_INFO: dict[str, dict[str, Any]] = {
+    "gemini": {
+        "name": "Google Gemini",
+        "env_key": "GEMINI_API_KEY",
+        "url": "https://aistudio.google.com/apikey",
+        "test_model": "gemini/gemini-2.0-flash",
+        "models": ["gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro-preview-06-05"],
+    },
+    "openai": {
+        "name": "OpenAI",
+        "env_key": "OPENAI_API_KEY",
+        "url": "https://platform.openai.com/api-keys",
+        "test_model": "openai/gpt-4o-mini",
+        "models": ["openai/gpt-4o-mini", "openai/gpt-4o", "openai/o1-mini"],
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "env_key": "ANTHROPIC_API_KEY",
+        "url": "https://console.anthropic.com/settings/keys",
+        "test_model": "anthropic/claude-3-5-haiku-20241022",
+        "models": [
+            "anthropic/claude-3-5-haiku-20241022",
+            "anthropic/claude-sonnet-4-20250514",
+        ],
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "env_key": "DEEPSEEK_API_KEY",
+        "url": "https://platform.deepseek.com/api_keys",
+        "test_model": "deepseek/deepseek-chat",
+        "models": ["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"],
+    },
+    "groq": {
+        "name": "Groq",
+        "env_key": "GROQ_API_KEY",
+        "url": "https://console.groq.com/keys",
+        "test_model": "groq/llama-3.3-70b-versatile",
+        "models": ["groq/llama-3.3-70b-versatile", "groq/mixtral-8x7b-32768"],
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "env_key": "OPENROUTER_API_KEY",
+        "url": "https://openrouter.ai/keys",
+        "test_model": "openrouter/google/gemini-2.0-flash-001",
+        "models": [
+            "openrouter/google/gemini-2.0-flash-001",
+            "openrouter/anthropic/claude-3.5-sonnet",
+        ],
+    },
+    "ollama": {
+        "name": "Ollama (локальный)",
+        "env_key": "OLLAMA_HOST",
+        "url": "https://ollama.ai/download",
+        "test_model": "ollama/llama3.2",
+        "models": ["ollama/llama3.2", "ollama/mistral"],
+        "default_value": "http://localhost:11434",
+    },
+    "ollama-cloud": {
+        "name": "Ollama Cloud",
+        "env_key": "OLLAMA_API_KEY",
+        "url": "https://ollama.com",
+        "test_model": "ollama-cloud/gpt-oss:120b-cloud",
+        "models": ["ollama-cloud/gpt-oss:120b-cloud"],
+        "base_url_env": "OLLAMA_CLOUD_BASE_URL",
+    },
+}
+
+
+def get_provider_env_key(provider_id: str) -> str | None:
+    """Get environment variable key for provider."""
+    info = PROVIDER_INFO.get(provider_id)
+    return info["env_key"] if info else None
+
+
+def get_enabled_providers() -> list[str]:
+    """Get list of providers with configured API keys."""
+    enabled = []
+    for pid, info in PROVIDER_INFO.items():
+        env_key = info.get("env_key")
+        if env_key is None:
+            enabled.append(pid)
+        elif os.getenv(env_key):
+            enabled.append(pid)
+    return enabled
