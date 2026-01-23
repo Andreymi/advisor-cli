@@ -151,3 +151,102 @@ class TestProvidersConfig:
             assert provider in PROVIDERS
             assert "env_key" in PROVIDERS[provider]
             assert "enabled" in PROVIDERS[provider]
+
+
+class TestCacheManager:
+    """Tests for CacheManager class."""
+
+    def test_singleton_pattern(self):
+        """get_cache_manager should return the same instance."""
+        from advisor_cli.core import get_cache_manager
+
+        manager1 = get_cache_manager()
+        manager2 = get_cache_manager()
+        assert manager1 is manager2
+
+    def test_initial_state(self):
+        """CacheManager should start with cache inactive."""
+        from advisor_cli.core import CacheManager
+
+        manager = CacheManager()
+        assert manager.llm_cache_active is False
+        assert manager.reasoning_cache == {}
+
+    def test_reasoning_cache_operations(self, tmp_path):
+        """CacheManager should handle reasoning cache operations."""
+        from unittest.mock import patch
+        from advisor_cli.core import CacheManager
+
+        manager = CacheManager()
+
+        # Mock CACHE_DIR to use tmp_path
+        with patch("advisor_cli.core.CACHE_DIR", tmp_path):
+            # Initially empty
+            assert manager.get_reasoning_type("gpt-4") is None
+
+            # Set and retrieve
+            manager.set_reasoning_type("gpt-4", "thinking")
+            assert manager.get_reasoning_type("gpt-4") == "thinking"
+
+            # Check is_model_cached
+            assert manager.is_model_cached("gpt-4") is True
+            assert manager.is_model_cached("unknown-model") is False
+
+    def test_reasoning_cache_persistence(self, tmp_path):
+        """Reasoning cache should persist to disk."""
+        from unittest.mock import patch
+        from advisor_cli.core import CacheManager
+
+        with patch("advisor_cli.core.CACHE_DIR", tmp_path):
+            # First manager sets value
+            manager1 = CacheManager()
+            manager1.set_reasoning_type("test-model", "thinking")
+
+            # Verify file was created
+            cache_file = tmp_path / "reasoning_models.json"
+            assert cache_file.exists()
+
+            # New manager loads from disk
+            manager2 = CacheManager()
+            manager2.load_reasoning_cache()
+            assert manager2.get_reasoning_type("test-model") == "thinking"
+
+    def test_clear_reasoning_cache(self, tmp_path):
+        """clear_reasoning_cache should remove all entries and delete file."""
+        from unittest.mock import patch
+        from advisor_cli.core import CacheManager
+
+        with patch("advisor_cli.core.CACHE_DIR", tmp_path):
+            manager = CacheManager()
+            manager.set_reasoning_type("model-1", "thinking")
+            manager.set_reasoning_type("model-2", "reasoning_effort")
+
+            cache_file = tmp_path / "reasoning_models.json"
+            assert cache_file.exists()
+
+            count = manager.clear_reasoning_cache()
+            assert count == 2
+            assert not cache_file.exists()
+            assert manager.reasoning_cache == {}
+
+    def test_refresh_reasoning_cache(self, tmp_path):
+        """refresh_reasoning_cache should reload from disk."""
+        import json
+        from unittest.mock import patch
+        from advisor_cli.core import CacheManager
+
+        with patch("advisor_cli.core.CACHE_DIR", tmp_path):
+            # Create cache file directly
+            cache_file = tmp_path / "reasoning_models.json"
+            tmp_path.mkdir(exist_ok=True)
+            cache_file.write_text(json.dumps({"disk-model": "thinking"}))
+
+            manager = CacheManager()
+            # Manually add in-memory entry
+            manager.reasoning_cache["memory-model"] = "reasoning_effort"
+            manager._reasoning_cache_loaded = True
+
+            # Refresh should discard memory and load from disk
+            manager.refresh_reasoning_cache()
+            assert "disk-model" in manager.reasoning_cache
+            assert "memory-model" not in manager.reasoning_cache

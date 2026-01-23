@@ -38,8 +38,9 @@ ALLOWED_EXTENSIONS = {
     ".zsh",
 }
 
-# Максимальный размер файла (100KB)
-MAX_FILE_SIZE = 100 * 1024
+# Maximum file size for context input (100KB)
+# Prevents accidental processing of large binary files or logs
+MAX_FILE_SIZE_BYTES = 100 * 1024
 
 
 def read_context_file(path: Path) -> str:
@@ -63,9 +64,9 @@ def read_context_file(path: Path) -> str:
         raise ValueError(f"Неподдерживаемый тип файла: {path.suffix}")
 
     file_size = path.stat().st_size
-    if file_size > MAX_FILE_SIZE:
+    if file_size > MAX_FILE_SIZE_BYTES:
         raise ValueError(
-            f"Файл слишком большой ({file_size // 1024}KB > {MAX_FILE_SIZE // 1024}KB)"
+            f"Файл слишком большой ({file_size // 1024}KB > {MAX_FILE_SIZE_BYTES // 1024}KB)"
         )
 
     return path.read_text(encoding="utf-8")

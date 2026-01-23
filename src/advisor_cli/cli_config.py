@@ -195,3 +195,16 @@ def config_purge(
         print_output("Configuration deleted")
     else:
         print_output("Nothing deleted")
+
+
+@config_app.command("cache-clear")
+def config_cache_clear() -> None:
+    """Clear reasoning model cache.
+
+    This forces re-detection of reasoning capabilities for all models.
+    Useful if a model's capabilities have changed or cache is corrupted.
+    """
+    from .core import get_cache_manager
+
+    count = get_cache_manager().clear_reasoning_cache()
+    print_output(f"Reasoning cache cleared ({count} entries removed)")

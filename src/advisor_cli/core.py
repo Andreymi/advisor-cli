@@ -49,32 +49,146 @@ PROMPT_VERSION = _hash_prompt(DEFAULT_ROLE)
 CACHE_ENABLED = os.getenv("ADVISOR_CACHE_ENABLED", "true").lower() == "true"
 CACHE_TTL = int(os.getenv("ADVISOR_CACHE_TTL", "3600"))
 # CACHE_DIR импортирован из config.py (~/.cache/advisor)
+
+# ===== Error Formatting =====
+# Maximum length for error messages before truncation
+ERROR_MSG_MAX_LENGTH = 150
+
+
+class CacheManager:
+    """Centralized cache management for LLM responses and reasoning models.
+
+    This class encapsulates all cache-related state to avoid module-level
+    mutable globals. Use the singleton instance via get_cache_manager().
+
+    Attributes:
+        llm_cache_active: Whether LLM response caching is enabled
+        reasoning_cache: Dict mapping model names to their reasoning types
+    """
+
+    def __init__(self):
+        self.llm_cache_active: bool = False
+        self.reasoning_cache: dict[str, Optional[str]] = {}
+        self._reasoning_cache_loaded: bool = False
+
+    def init_llm_cache(self) -> bool:
+        """Initialize LLM response cache with graceful degradation."""
+        if not CACHE_ENABLED:
+            return False
+
+        try:
+            from litellm.caching.caching import Cache
+
+            redis_url = os.getenv("REDIS_URL")
+            if redis_url:
+                litellm.cache = Cache(type="redis", url=redis_url, ttl=CACHE_TTL)
+            else:
+                CACHE_DIR.mkdir(exist_ok=True)
+                litellm.cache = Cache(
+                    type="disk", disk_cache_dir=str(CACHE_DIR), ttl=CACHE_TTL
+                )
+            self.llm_cache_active = True
+            return True
+        except (ImportError, OSError, PermissionError) as e:
+            print(f"[advisor] Cache init failed: {e}. Continuing without cache.")
+            return False
+
+    def load_reasoning_cache(self) -> None:
+        """Load reasoning model cache from disk."""
+        if self._reasoning_cache_loaded:
+            return
+
+        reasoning_file = CACHE_DIR / "reasoning_models.json"
+        try:
+            if reasoning_file.exists():
+                with open(reasoning_file, "r") as f:
+                    self.reasoning_cache = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+        self._reasoning_cache_loaded = True
+
+    def save_reasoning_cache(self) -> None:
+        """Save reasoning model cache to disk."""
+        reasoning_file = CACHE_DIR / "reasoning_models.json"
+        try:
+            CACHE_DIR.mkdir(exist_ok=True)
+            with open(reasoning_file, "w") as f:
+                json.dump(self.reasoning_cache, f, indent=2)
+        except (OSError, PermissionError):
+            pass
+
+    def get_reasoning_type(self, model: str) -> Optional[str]:
+        """Get cached reasoning type for a model."""
+        self.load_reasoning_cache()
+        return self.reasoning_cache.get(model)
+
+    def set_reasoning_type(self, model: str, reasoning_type: Optional[str]) -> None:
+        """Cache reasoning type for a model."""
+        self.load_reasoning_cache()
+        if model not in self.reasoning_cache:
+            self.reasoning_cache[model] = reasoning_type
+            self.save_reasoning_cache()
+
+    def is_model_cached(self, model: str) -> bool:
+        """Check if model is in reasoning cache."""
+        self.load_reasoning_cache()
+        return model in self.reasoning_cache
+
+    def clear_reasoning_cache(self) -> int:
+        """Clear all entries from reasoning cache.
+
+        Returns:
+            Number of entries cleared
+        """
+        self.load_reasoning_cache()
+        count = len(self.reasoning_cache)
+        self.reasoning_cache.clear()
+        self._reasoning_cache_loaded = False
+
+        # Delete cache file
+        reasoning_file = CACHE_DIR / "reasoning_models.json"
+        try:
+            if reasoning_file.exists():
+                reasoning_file.unlink()
+        except OSError:
+            pass
+
+        return count
+
+    def refresh_reasoning_cache(self) -> None:
+        """Reload reasoning cache from disk, discarding in-memory changes."""
+        self._reasoning_cache_loaded = False
+        self.reasoning_cache.clear()
+        self.load_reasoning_cache()
+
+
+# Singleton instance
+_cache_manager: Optional[CacheManager] = None
+
+
+def get_cache_manager() -> CacheManager:
+    """Get or create the singleton CacheManager instance."""
+    global _cache_manager
+    if _cache_manager is None:
+        _cache_manager = CacheManager()
+    return _cache_manager
+
+
+# Backward-compatible module-level variable
+# Updated by init_cache() for code that imports CACHE_ACTIVE directly
 CACHE_ACTIVE = False
 
 
 def init_cache() -> bool:
-    """Initialize cache with graceful degradation."""
+    """Initialize cache with graceful degradation.
+
+    This is a backward-compatible wrapper around CacheManager.init_llm_cache().
+    Updates the module-level CACHE_ACTIVE for backward compatibility.
+    """
     global CACHE_ACTIVE
-
-    if not CACHE_ENABLED:
-        return False
-
-    try:
-        from litellm.caching.caching import Cache
-
-        redis_url = os.getenv("REDIS_URL")
-        if redis_url:
-            litellm.cache = Cache(type="redis", url=redis_url, ttl=CACHE_TTL)
-        else:
-            CACHE_DIR.mkdir(exist_ok=True)
-            litellm.cache = Cache(
-                type="disk", disk_cache_dir=str(CACHE_DIR), ttl=CACHE_TTL
-            )
-        CACHE_ACTIVE = True
-        return True
-    except (ImportError, OSError, PermissionError) as e:
-        print(f"[advisor] Cache init failed: {e}. Continuing without cache.")
-        return False
+    result = get_cache_manager().init_llm_cache()
+    CACHE_ACTIVE = get_cache_manager().llm_cache_active
+    return result
 
 
 # ===== Конфигурация провайдеров =====
@@ -218,9 +332,9 @@ def format_error(e: Exception, include_prefix: bool = True) -> str:
         if error_msg.startswith(litellm_prefix):
             error_msg = error_msg[len(litellm_prefix) :].strip()
 
-    # Обрезаем слишком длинные сообщения
-    if len(error_msg) > 150:
-        error_msg = error_msg[:150] + "..."
+    # Truncate overly long messages
+    if len(error_msg) > ERROR_MSG_MAX_LENGTH:
+        error_msg = error_msg[:ERROR_MSG_MAX_LENGTH] + "..."
 
     if error_msg:
         return f"{prefix}{error_msg}"
@@ -251,33 +365,6 @@ KNOWN_REASONING_MODELS = {
     "reasoner": "thinking",
 }
 
-REASONING_CACHE_FILE = CACHE_DIR / "reasoning_models.json"
-_reasoning_cache: dict[str, Optional[str]] = {}
-
-
-def _load_reasoning_cache() -> dict[str, Optional[str]]:
-    """Load cache of auto-detected reasoning models."""
-    try:
-        if REASONING_CACHE_FILE.exists():
-            with open(REASONING_CACHE_FILE, "r") as f:
-                return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        pass
-    return {}
-
-
-def _save_reasoning_cache():
-    """Save cache of auto-detected reasoning models."""
-    try:
-        CACHE_DIR.mkdir(exist_ok=True)
-        with open(REASONING_CACHE_FILE, "w") as f:
-            json.dump(_reasoning_cache, f, indent=2)
-    except (OSError, PermissionError):
-        pass
-
-
-_reasoning_cache = _load_reasoning_cache()
-
 
 def _get_reasoning_type_from_registry(model: str) -> Optional[str]:
     """Look up reasoning type in registry by model name patterns."""
@@ -289,15 +376,18 @@ def _get_reasoning_type_from_registry(model: str) -> Optional[str]:
 
 
 def _is_model_cached(model: str) -> bool:
-    """Check if model is in cache (regardless of value)."""
-    return model in _reasoning_cache
+    """Check if model is in reasoning cache."""
+    return get_cache_manager().is_model_cached(model)
 
 
 def _get_reasoning_type(model: str) -> Optional[str]:
     """Determine reasoning type for model."""
-    if model in _reasoning_cache:
-        return _reasoning_cache[model]
+    # Check cache first
+    cached = get_cache_manager().get_reasoning_type(model)
+    if cached is not None:
+        return cached
 
+    # Check registry
     from_registry = _get_reasoning_type_from_registry(model)
     if from_registry:
         return from_registry
@@ -307,9 +397,7 @@ def _get_reasoning_type(model: str) -> Optional[str]:
 
 def _cache_reasoning_type(model: str, reasoning_type: Optional[str]):
     """Save model's reasoning type to cache."""
-    if model not in _reasoning_cache:
-        _reasoning_cache[model] = reasoning_type
-        _save_reasoning_cache()
+    get_cache_manager().set_reasoning_type(model, reasoning_type)
 
 
 def get_reasoning_kwargs(model: str, reasoning: Optional[str]) -> dict:
