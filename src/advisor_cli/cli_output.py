@@ -2,7 +2,7 @@
 
 This module provides output formatting and printing functions:
 - print_output: Simple output to stdout/stderr with newline
-- parse_format: Parse format string to ResponseFormat enum
+- _parse_format: Parse format string to ResponseFormat enum (private)
 
 These utilities are used throughout the CLI for consistent output handling.
 """
@@ -27,7 +27,7 @@ def print_output(text: str, error: bool = False) -> None:
         sys.stdout.write(text + "\n")
 
 
-def parse_format(format: str | None) -> ResponseFormat:
+def _parse_format(format: str | None) -> ResponseFormat:
     """Parse format string to ResponseFormat enum.
 
     Handles case-insensitive format parsing with sensible defaults.

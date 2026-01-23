@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from advisor_cli.cli_output import print_output, parse_format
+from advisor_cli.cli_output import _parse_format, print_output
 from advisor_cli.core import ResponseFormat
 
 
@@ -32,36 +32,36 @@ class TestPrintOutput:
 
 
 class TestParseFormat:
-    """Tests for parse_format function."""
+    """Tests for _parse_format function."""
 
     def test_none_returns_markdown(self):
-        """parse_format(None) should return MARKDOWN."""
-        result = parse_format(None)
+        """_parse_format(None) should return MARKDOWN."""
+        result = _parse_format(None)
         assert result == ResponseFormat.MARKDOWN
 
     def test_json_lowercase(self):
-        """parse_format('json') should return JSON."""
-        result = parse_format("json")
+        """_parse_format('json') should return JSON."""
+        result = _parse_format("json")
         assert result == ResponseFormat.JSON
 
     def test_json_uppercase(self):
-        """parse_format('JSON') should return JSON."""
-        result = parse_format("JSON")
+        """_parse_format('JSON') should return JSON."""
+        result = _parse_format("JSON")
         assert result == ResponseFormat.JSON
 
     def test_markdown_lowercase(self):
-        """parse_format('markdown') should return MARKDOWN."""
-        result = parse_format("markdown")
+        """_parse_format('markdown') should return MARKDOWN."""
+        result = _parse_format("markdown")
         assert result == ResponseFormat.MARKDOWN
 
     def test_markdown_mixed_case(self):
-        """parse_format('MarkDown') should return MARKDOWN."""
-        result = parse_format("MarkDown")
+        """_parse_format('MarkDown') should return MARKDOWN."""
+        result = _parse_format("MarkDown")
         assert result == ResponseFormat.MARKDOWN
 
     def test_invalid_format_exits(self):
-        """parse_format with invalid format should raise typer.Exit."""
+        """_parse_format with invalid format should raise typer.Exit."""
         with pytest.raises(typer.Exit) as exc_info:
-            parse_format("invalid_format")
+            _parse_format("invalid_format")
 
         assert exc_info.value.exit_code == 1
