@@ -651,3 +651,26 @@ git diff --stat HEAD~6
 | 6 | Centralize asyncio.run | SMALL |
 
 **Total:** 6 tasks, ~6 commits
+
+---
+
+## Task 7: Split cli.py into modules (DEFERRED)
+
+**Problem:** cli.py grew to 1100+ lines with 20 commands.
+
+**Solution:** Split by responsibility:
+
+```
+src/advisor_cli/
+├── cli.py              # Entry point only (~50 lines)
+├── cli_utils.py        # Shared: print_output, helpers (~100 lines)
+├── cli_core.py         # ask, compare, result, status, models (~300 lines)
+├── cli_config.py       # config sub-app (~150 lines)
+├── cli_mcp.py          # mcp sub-app (~250 lines)
+├── cli_skill.py        # skill sub-app (~150 lines)
+├── cli_install.py      # unified install (~100 lines)
+```
+
+**Effort:** MEDIUM
+
+**Priority:** Low (code works, just organization)
