@@ -20,6 +20,8 @@ advisor mcp install
 **CLI commands:**
 - `advisor ask` — get response from a single model
 - `advisor compare` — compare responses from multiple models
+- `advisor setup` — interactive configuration (action-based menu)
+- `advisor config show` — view configuration and paths
 - `advisor mcp install` — add MCP integration to Claude Code/Desktop
 
 **Additional:**
@@ -84,7 +86,9 @@ GEMINI_API_KEY=xxx OPENAI_API_KEY=xxx advisor setup -y
 advisor mcp install -y
 ```
 
-### Manual configuration (.env)
+### Manual configuration
+
+Configuration is stored in `~/.config/advisor/config.env`:
 
 ```bash
 # Providers (enabled only with keys)
@@ -97,7 +101,7 @@ DEEPSEEK_API_KEY=your_key
 ADVISOR_DEFAULT_MODEL=gemini/gemini-2.0-flash
 ADVISOR_DEFAULT_MODELS_COMPARE=gemini/gemini-2.0-flash,openai/gpt-4o-mini
 
-# Caching
+# Caching (stored in ~/.cache/advisor/)
 ADVISOR_CACHE_ENABLED=true
 ADVISOR_CACHE_TTL=3600
 ```
@@ -150,9 +154,18 @@ advisor status
 # Show models
 advisor models
 
+# Show full configuration (paths, masked keys)
+advisor config show
+
 # Set default model
 advisor config single gemini/gemini-2.5-pro
 advisor config compare "openai/gpt-4o,gemini/gemini-2.0-flash"
+
+# Remove configuration (API keys)
+advisor config purge
+
+# Full cleanup (config + cache)
+advisor uninstall
 ```
 
 ## MCP Integration
