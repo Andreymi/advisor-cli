@@ -282,6 +282,57 @@ def get_enabled_models_hint() -> str:
     return f"Доступные провайдеры: {', '.join(all_enabled)}"
 
 
+async def verify_provider(provider_id: str) -> tuple[str, bool, str]:
+    """Verify that a provider's API key is valid.
+
+    Makes a minimal test request to check authentication.
+
+    Args:
+        provider_id: Provider identifier (e.g., 'gemini', 'openai')
+
+    Returns:
+        Tuple of (provider_id, success, error_message)
+    """
+    from .config import PROVIDER_INFO
+
+    info = PROVIDER_INFO.get(provider_id)
+    if not info:
+        return provider_id, False, "Неизвестный провайдер"
+
+    test_model = info.get("test_model")
+    if not test_model:
+        return provider_id, True, ""  # No test model, assume OK
+
+    try:
+        kwargs = get_completion_kwargs(test_model)
+        # Minimal request - just check auth
+        await _acompletion(
+            messages=[{"role": "user", "content": "Hi"}],
+            max_tokens=1,
+            **kwargs,
+        )
+        return provider_id, True, ""
+    except Exception as e:
+        error_msg = format_error(e, include_prefix=False)
+        return provider_id, False, error_msg
+
+
+async def verify_providers(provider_ids: list[str]) -> dict[str, tuple[bool, str]]:
+    """Verify multiple providers in parallel.
+
+    Args:
+        provider_ids: List of provider identifiers
+
+    Returns:
+        Dict mapping provider_id to (success, error_message)
+    """
+    if not provider_ids:
+        return {}
+
+    results = await asyncio.gather(*[verify_provider(pid) for pid in provider_ids])
+    return {pid: (ok, err) for pid, ok, err in results}
+
+
 def get_completion_kwargs(model: str) -> dict:
     """Return completion kwargs based on model."""
     if model.startswith("ollama-cloud/"):
@@ -318,10 +369,33 @@ def format_error(e: Exception, include_prefix: bool = True) -> str:
 
     # Паттерны ошибок: (условие, сообщение)
     error_patterns = [
+        # Gemini 400
         (
             lambda t, m: "400" in m and "API key not valid" in m,
             "Неверный API ключ. Проверьте GEMINI_API_KEY.",
         ),
+        # OpenAI 401
+        (
+            lambda t, m: "401" in m and "openai" in m.lower(),
+            "Неверный API ключ. Проверьте OPENAI_API_KEY.",
+        ),
+        # Anthropic 401
+        (
+            lambda t, m: "401" in m and "anthropic" in m.lower(),
+            "Неверный API ключ. Проверьте ANTHROPIC_API_KEY.",
+        ),
+        # DeepSeek
+        (
+            lambda t, m: "deepseek" in m.lower()
+            and ("401" in m or "invalid" in m.lower()),
+            "Неверный API ключ. Проверьте DEEPSEEK_API_KEY.",
+        ),
+        # Groq
+        (
+            lambda t, m: "groq" in m.lower() and ("401" in m or "invalid" in m.lower()),
+            "Неверный API ключ. Проверьте GROQ_API_KEY.",
+        ),
+        # Generic 401
         (
             lambda t, m: "401" in m or "Unauthorized" in m,
             "Неверный API ключ. Проверьте переменные окружения.",

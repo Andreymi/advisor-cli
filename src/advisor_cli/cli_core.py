@@ -256,16 +256,25 @@ def result(
 @core_app.command()
 def status() -> None:
     """Показать текущий статус конфигурации."""
-    from .core import CACHE_ENABLED
+    from .core import CACHE_ENABLED, verify_providers
 
     print_output("\nAdvisor CLI - Статус\n")
 
     if ENABLED_PROVIDERS or CUSTOM_PROVIDERS:
-        print_output("Включённые провайдеры:")
+        print_output("Провайдеры (проверяю доступность...):")
+
+        # Verify all enabled providers in parallel
+        results = run_async(verify_providers(ENABLED_PROVIDERS))
+
         for provider in ENABLED_PROVIDERS:
-            print_output(f"  - {provider}")
+            ok, err = results.get(provider, (True, ""))
+            if ok:
+                print_output(f"  ✓ {provider}")
+            else:
+                print_output(f"  ✗ {provider} — {err}")
+
         for provider in CUSTOM_PROVIDERS:
-            print_output(f"  - {provider} (custom)")
+            print_output(f"  ? {provider} (custom, не проверен)")
     else:
         print_output("Нет включённых провайдеров.")
         print_output("Запустите 'advisor setup' для настройки.")
