@@ -11,14 +11,15 @@
 ```
 src/advisor_cli/
 ├── cli.py              — CLI entry point (94 lines)
-├── cli_async.py        — Async task utilities (TASK_TTL, create/get tasks)
+├── cli_async.py        — Task API: TaskStatus, update_task_status, get_async_result
 ├── cli_output.py       — Output helpers (print_output, _parse_format)
 ├── cli_core.py         — Core commands (ask, compare, result, status, models)
-├── cli_config.py       — Config commands (single, compare, format, show, purge)
+├── cli_config.py       — Config commands (single, compare, format, show, purge, cache-clear)
 ├── cli_mcp.py          — MCP commands (install, uninstall, status)
 ├── cli_skill.py        — Skill commands (install, uninstall, status)
 ├── cli_install.py      — Unified install/uninstall commands
-├── core.py             — LLM logic (no MCP dependency)
+├── core.py             — LLM logic + CacheManager (no MCP dependency)
+├── task_runner.py      — Background task execution with timeout (subprocess entry point)
 ├── config.py           — XDG config management
 ├── server.py           — MCP server (optional)
 ├── setup_wizard.py     — Interactive wizard
@@ -49,6 +50,7 @@ src/advisor_cli/
 - `advisor config single <model>` — set default model
 - `advisor config compare <models>` — set consilium models
 - `advisor config purge` — remove config (API keys)
+- `advisor config cache-clear` — clear reasoning model cache
 - `advisor uninstall` — remove all data (config + cache)
 
 ### MCP
@@ -98,6 +100,12 @@ src/advisor_cli/
 ## Hooks
 - `PostToolUse` — ruff format/check for .py files
 - `PreToolUse` — protect .env from editing
+
+## Architecture Notes
+- Task API lives in `cli_async.py` (single source of truth for TaskStatus, update_task_status)
+- `task_runner.py` is subprocess entry point only — imports from cli_async
+- Cache state in `CacheManager` class (core.py) — use `get_cache_manager()` singleton
+- `docs/` directory is gitignored (internal documentation)
 
 ## Important
 - Config contains API keys — do NOT commit, do NOT edit via Claude
