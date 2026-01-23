@@ -1,52 +1,81 @@
 # Advisor CLI Project
 
 ## Tech Stack
-- Python 3.10+ с FastMCP (MCP server framework)
-- LiteLLM для мульти-провайдерной поддержки LLM
-- Pydantic для валидации данных
-- diskcache для кэширования ответов
-- typer + rich + questionary для CLI
+- Python 3.10+ with FastMCP (MCP server framework)
+- LiteLLM for multi-provider LLM support
+- Pydantic for data validation
+- diskcache for response caching
+- typer + rich + questionary for CLI
 
 ## Project Structure
-- `src/advisor_cli/core.py` — логика LLM (без MCP зависимости)
-- `src/advisor_cli/server.py` — MCP сервер (optional)
-- `src/advisor_cli/cli.py` — CLI интерфейс
-- `src/advisor_cli/setup_wizard.py` — интерактивный wizard
-- `src/advisor_cli/file_utils.py` — работа с файлами
-- `.env` — API ключи для провайдеров
+```
+src/advisor_cli/
+├── cli.py              — CLI interface (commands)
+├── core.py             — LLM logic (no MCP dependency)
+├── config.py           — XDG config management
+├── server.py           — MCP server (optional)
+├── setup_wizard.py     — Interactive wizard
+├── file_utils.py       — File operations
+├── mcp_manager.py      — MCP installation logic
+├── skill_manager.py    — Skill installation logic
+├── utils.py            — Shared utilities (require_wizard, run_async)
+└── data/skills/        — Bundled skill for distribution
+```
 
 ## Commands
-- `advisor ask "query"` — одиночный запрос к LLM
-- `advisor compare "query"` — консилиум нескольких моделей
-- `advisor result <id>` — получить результат async задачи
-- `advisor config single <model>` — установить модель по умолчанию
-- `advisor config compare <models>` — установить модели для консилиума
-- `advisor models` — показать конфигурацию моделей
-- `advisor setup` — интерактивная настройка
-- `advisor setup -y` — неинтерактивная настройка из env vars
-- `advisor mcp install` — установить MCP в Claude Code/Desktop
-- `advisor mcp uninstall` — удалить MCP из конфигов
-- `advisor mcp status` — показать статус MCP интеграции
-- `advisor run` — запуск MCP сервера (требует `[mcp]`)
-- `advisor status` — показать статус
-- `uv sync` — установка зависимостей
-- `uv run pytest tests/ -v` — запуск тестов
+
+### Core
+- `advisor ask "query"` — single LLM request
+- `advisor compare "query"` — multi-model consilium
+- `advisor result <id>` — get async task result
+- `advisor status` — show current status
+- `advisor models` — show model configuration
+
+### Installation (unified)
+- `advisor install` — install MCP + Skill (asks scope)
+- `advisor install --scope project` — install to current project
+- `advisor install --scope user` — install globally
+
+### Config
+- `advisor setup` — interactive configuration
+- `advisor config show` — show config paths and values
+- `advisor config single <model>` — set default model
+- `advisor config compare <models>` — set consilium models
+- `advisor config purge` — remove config (API keys)
+- `advisor uninstall` — remove all data (config + cache)
+
+### MCP
+- `advisor mcp install` — install MCP integration
+- `advisor mcp uninstall` — remove MCP integration
+- `advisor mcp status` — show MCP status
+- `advisor run` — run MCP server (requires `[mcp]`)
+
+### Skill
+- `advisor skill install` — install Claude Code skill
+- `advisor skill uninstall` — remove skill
+- `advisor skill status` — show skill status
+
+### Development
+- `uv sync` — install dependencies
+- `uv run pytest tests/ -v` — run tests
 
 ## CLI Features
 - Stdin pipe: `cat code.py | advisor ask "Review this"`
 - File input: `advisor ask -f code.py "Review"`
-- Async mode: `advisor ask --async "Long query"` → `advisor result <id>`
+- Async mode: `advisor compare --async "query"` → `advisor result <id>`
 - Formats: `--format json|markdown`
 
-## Optional Dependencies
-- `pip install .` — базовый CLI без MCP
-- `pip install .[mcp]` — с MCP сервером
-- `pip install .[wizard]` — с интерактивным wizard
-- `pip install .[all]` — всё
+## Configuration Paths (XDG)
+- Config: `~/.config/advisor/config.env`
+- Cache: `~/.cache/advisor/`
+- Skill (user): `~/.claude/skills/advisor/`
+- Skill (project): `.claude/skills/advisor/`
 
-## Hooks (автоматизация)
-- `PostToolUse` — ruff format/check для .py файлов
-- `PreToolUse` — защита .env от редактирования
+## Optional Dependencies
+- `pip install advisor-cli` — basic CLI
+- `pip install advisor-cli[mcp]` — with MCP server
+- `pip install advisor-cli[wizard]` — with interactive wizard
+- `pip install advisor-cli[all]` — everything
 
 ## Supported Providers
 - Gemini (`gemini/gemini-*`)
@@ -59,18 +88,13 @@
 - Ollama Cloud (`ollama-cloud/*`)
 - Custom providers via `ADVISOR_CUSTOM_PROVIDERS` env var
 
-### GigaChat (advanced)
-GigaChat требует отдельного пакета `litellm-gigachat`:
-```bash
-pip install litellm-gigachat
-litellm-gigachat  # запуск прокси на :4000
-```
-Затем использовать через OpenRouter или custom provider.
+## Hooks
+- `PostToolUse` — ruff format/check for .py files
+- `PreToolUse` — protect .env from editing
 
 ## Important
-- `.env` содержит API ключи — НЕ коммитить, НЕ редактировать через Claude
-- Кэш ответов в `.mcp_cache/`
+- Config contains API keys — do NOT commit, do NOT edit via Claude
+- Use `advisor config show` to see current configuration
 
 ## Available Skills
-
-- `/advisor` — get second opinion from alternative LLMs (Gemini, GPT, Ollama Cloud)
+- `/advisor` — get second opinion from alternative LLMs (Gemini, GPT, DeepSeek, etc.)
