@@ -29,7 +29,6 @@ from .core import (  # noqa: E402
     consult_expert,
     init_cache,
 )
-from .file_utils import read_context_file  # noqa: E402
 
 app = typer.Typer(
     name="advisor",
@@ -98,13 +97,6 @@ def print_output(text: str, error: bool = False):
         sys.stdout.write(text + "\n")
 
 
-def read_stdin() -> str | None:
-    """Читает stdin если есть данные."""
-    if not sys.stdin.isatty():
-        return sys.stdin.read()
-    return None
-
-
 # ===== Commands =====
 @app.command()
 def ask(
@@ -122,31 +114,16 @@ def ask(
     ),
 ):
     """Получить ответ от LLM."""
+    from .file_utils import build_context
+
     cleanup_old_tasks()
     init_cache()
 
-    # Собираем контекст
-    final_context = context or ""
-
-    # Из stdin
-    stdin_data = read_stdin()
-    if stdin_data:
-        final_context = (
-            stdin_data if not final_context else f"{final_context}\n\n{stdin_data}"
-        )
-
-    # Из файла
-    if file:
-        try:
-            file_content = read_context_file(file)
-            final_context = (
-                file_content
-                if not final_context
-                else f"{final_context}\n\n{file_content}"
-            )
-        except (ValueError, FileNotFoundError) as e:
-            print_output(str(e), error=True)
-            raise typer.Exit(1)
+    try:
+        final_context = build_context(context, file)
+    except (ValueError, FileNotFoundError) as e:
+        print_output(str(e), error=True)
+        raise typer.Exit(1)
 
     # Формат ответа
     response_format = ResponseFormat.MARKDOWN
@@ -191,31 +168,16 @@ def compare(
     background: bool = typer.Option(False, "--async", help="Запустить в фоне"),
 ):
     """Получить ответы от нескольких LLM (консилиум)."""
+    from .file_utils import build_context
+
     cleanup_old_tasks()
     init_cache()
 
-    # Собираем контекст
-    final_context = context or ""
-
-    # Из stdin
-    stdin_data = read_stdin()
-    if stdin_data:
-        final_context = (
-            stdin_data if not final_context else f"{final_context}\n\n{stdin_data}"
-        )
-
-    # Из файла
-    if file:
-        try:
-            file_content = read_context_file(file)
-            final_context = (
-                file_content
-                if not final_context
-                else f"{final_context}\n\n{file_content}"
-            )
-        except (ValueError, FileNotFoundError) as e:
-            print_output(str(e), error=True)
-            raise typer.Exit(1)
+    try:
+        final_context = build_context(context, file)
+    except (ValueError, FileNotFoundError) as e:
+        print_output(str(e), error=True)
+        raise typer.Exit(1)
 
     # Формат ответа
     response_format = ResponseFormat.MARKDOWN

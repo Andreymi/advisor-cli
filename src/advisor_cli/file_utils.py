@@ -74,3 +74,52 @@ def read_context_file(path: Path) -> str:
 def get_allowed_extensions_str() -> str:
     """Возвращает строку с поддерживаемыми расширениями."""
     return ", ".join(sorted(ALLOWED_EXTENSIONS))
+
+
+def read_stdin() -> str | None:
+    """Читает stdin если есть данные.
+
+    Returns:
+        Содержимое stdin или None если stdin пуст или это терминал
+    """
+    import sys
+
+    if not sys.stdin.isatty():
+        return sys.stdin.read()
+    return None
+
+
+def build_context(
+    context: str | None = None,
+    file: Path | None = None,
+) -> str:
+    """Собирает контекст из inline, stdin и файла.
+
+    Args:
+        context: Inline context string
+        file: Path to context file
+
+    Returns:
+        Combined context string
+
+    Raises:
+        ValueError: If file not found or too large
+        FileNotFoundError: If file doesn't exist
+    """
+    final_context = context or ""
+
+    # Из stdin
+    stdin_data = read_stdin()
+    if stdin_data:
+        final_context = (
+            stdin_data if not final_context else f"{final_context}\n\n{stdin_data}"
+        )
+
+    # Из файла
+    if file:
+        file_content = read_context_file(file)
+        final_context = (
+            file_content if not final_context else f"{final_context}\n\n{file_content}"
+        )
+
+    return final_context
