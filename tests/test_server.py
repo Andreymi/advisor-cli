@@ -68,6 +68,13 @@ class TestFormatError:
         error = _format_error(Exception("Something went wrong"))
         assert "Something went wrong" in error
 
+    def test_gemini_invalid_api_key(self):
+        """Test Gemini's 400 'API key not valid' error is handled."""
+        error = _format_error(
+            Exception('{"error": {"code": 400, "message": "API key not valid"}}')
+        )
+        assert "GEMINI_API_KEY" in error
+
 
 class TestGetEnabledModelsHint:
     """Tests for _get_enabled_models_hint function."""

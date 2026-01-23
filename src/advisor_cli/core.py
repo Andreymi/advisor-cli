@@ -28,7 +28,8 @@ def _get_litellm():
         import litellm
 
         _litellm = litellm
-        # Configure verbose mode on first import
+        # Suppress litellm's noisy output (Give Feedback, debug info)
+        _litellm.suppress_debug_info = True
         _litellm.set_verbose = os.getenv("ADVISOR_VERBOSE", "false").lower() == "true"
     return _litellm
 
@@ -317,6 +318,10 @@ def format_error(e: Exception, include_prefix: bool = True) -> str:
 
     # Паттерны ошибок: (условие, сообщение)
     error_patterns = [
+        (
+            lambda t, m: "400" in m and "API key not valid" in m,
+            "Неверный API ключ. Проверьте GEMINI_API_KEY.",
+        ),
         (
             lambda t, m: "401" in m or "Unauthorized" in m,
             "Неверный API ключ. Проверьте переменные окружения.",
