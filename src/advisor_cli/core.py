@@ -78,40 +78,23 @@ def init_cache() -> bool:
 
 
 # ===== Конфигурация провайдеров =====
-PROVIDERS = {
-    "gemini": {
-        "env_key": "GEMINI_API_KEY",
-        "enabled": bool(os.getenv("GEMINI_API_KEY")),
-    },
-    "openai": {
-        "env_key": "OPENAI_API_KEY",
-        "enabled": bool(os.getenv("OPENAI_API_KEY")),
-    },
-    "deepseek": {
-        "env_key": "DEEPSEEK_API_KEY",
-        "enabled": bool(os.getenv("DEEPSEEK_API_KEY")),
-    },
-    "ollama": {
-        "env_key": "OLLAMA_HOST",
-        "enabled": bool(os.getenv("OLLAMA_HOST")),
-    },
-    "ollama-cloud": {
-        "env_key": "OLLAMA_API_KEY",
-        "enabled": bool(os.getenv("OLLAMA_API_KEY")),
-    },
-    "anthropic": {
-        "env_key": "ANTHROPIC_API_KEY",
-        "enabled": bool(os.getenv("ANTHROPIC_API_KEY")),
-    },
-    "groq": {
-        "env_key": "GROQ_API_KEY",
-        "enabled": bool(os.getenv("GROQ_API_KEY")),
-    },
-    "openrouter": {
-        "env_key": "OPENROUTER_API_KEY",
-        "enabled": bool(os.getenv("OPENROUTER_API_KEY")),
-    },
-}
+# Import here to avoid circular imports (PROVIDER_INFO is now in config.py)
+from .config import PROVIDER_INFO
+
+
+def _build_providers() -> dict:
+    """Build PROVIDERS dict from PROVIDER_INFO."""
+    providers = {}
+    for pid, info in PROVIDER_INFO.items():
+        env_key = info.get("env_key")
+        providers[pid] = {
+            "env_key": env_key,
+            "enabled": bool(os.getenv(env_key)) if env_key else False,
+        }
+    return providers
+
+
+PROVIDERS = _build_providers()
 
 CUSTOM_PROVIDERS = [
     p.strip() for p in os.getenv("ADVISOR_CUSTOM_PROVIDERS", "").split(",") if p.strip()
