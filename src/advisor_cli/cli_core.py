@@ -256,8 +256,7 @@ def result(
 @core_app.command()
 def status() -> None:
     """Показать текущий статус конфигурации."""
-    init_cache()
-    from .core import CACHE_ACTIVE
+    from .core import CACHE_ENABLED
 
     print_output("\nAdvisor CLI - Статус\n")
 
@@ -271,7 +270,7 @@ def status() -> None:
         print_output("Нет включённых провайдеров.")
         print_output("Запустите 'advisor setup' для настройки.")
 
-    print_output(f"\nКэширование: {'включено' if CACHE_ACTIVE else 'выключено'}\n")
+    print_output(f"\nКэширование: {'включено' if CACHE_ENABLED else 'выключено'}\n")
 
 
 @core_app.command("models")

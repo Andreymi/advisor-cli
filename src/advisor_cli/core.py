@@ -14,10 +14,30 @@ import json
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ConfigDict
-from litellm import acompletion
-import litellm
 
 from .config import CACHE_DIR, CONFIG_FILE
+
+# Lazy litellm import - loaded on first use to avoid 1s+ startup delay
+_litellm = None
+
+
+def _get_litellm():
+    """Lazy import litellm module."""
+    global _litellm
+    if _litellm is None:
+        import litellm
+
+        _litellm = litellm
+        # Configure verbose mode on first import
+        _litellm.set_verbose = os.getenv("ADVISOR_VERBOSE", "false").lower() == "true"
+    return _litellm
+
+
+async def _acompletion(*args, **kwargs):
+    """Lazy wrapper for litellm.acompletion."""
+    litellm = _get_litellm()
+    return await litellm.acompletion(*args, **kwargs)
+
 
 # ===== Загрузка конфигурации =====
 # Загружаем из XDG-совместимого пути (~/.config/advisor/config.env)
@@ -26,9 +46,6 @@ if CONFIG_FILE.exists():
 else:
     # Fallback на переменные окружения
     load_dotenv()
-
-# ===== Логирование =====
-litellm.set_verbose = os.getenv("ADVISOR_VERBOSE", "false").lower() == "true"
 
 # ===== Роль эксперта =====
 DEFAULT_ROLE = os.getenv(
@@ -79,6 +96,7 @@ class CacheManager:
         try:
             from litellm.caching.caching import Cache
 
+            litellm = _get_litellm()
             redis_url = os.getenv("REDIS_URL")
             if redis_url:
                 litellm.cache = Cache(type="redis", url=redis_url, ttl=CACHE_TTL)
@@ -454,7 +472,7 @@ async def completion_with_auto_detect(
         kwargs.update(reasoning_kwargs)
 
     try:
-        response = await acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
+        response = await _acompletion(messages=messages, caching=CACHE_ACTIVE, **kwargs)
         reasoning_content = extract_reasoning(response)
 
         if auto_detect and reasoning:
@@ -480,7 +498,7 @@ async def completion_with_auto_detect(
             for key in reasoning_kwargs:
                 kwargs.pop(key, None)
 
-            response = await acompletion(
+            response = await _acompletion(
                 messages=messages, caching=CACHE_ACTIVE, **kwargs
             )
             _cache_reasoning_type(model, None)
