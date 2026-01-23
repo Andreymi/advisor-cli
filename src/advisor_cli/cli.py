@@ -29,6 +29,7 @@ from .core import (  # noqa: E402
     consult_expert,
     init_cache,
 )
+from .utils import require_wizard  # noqa: E402
 
 app = typer.Typer(
     name="advisor",
@@ -279,6 +280,7 @@ def run():
 
 
 @app.command()
+@require_wizard
 def setup(
     yes: bool = typer.Option(
         False, "-y", help="Неинтерактивный режим (использовать env vars)"
@@ -291,24 +293,17 @@ def setup(
     ),
 ):
     """Интерактивная настройка конфигурации (требует установки с [wizard])."""
-    try:
-        from .setup_wizard import run_setup
+    from .setup_wizard import run_setup
 
-        provider_list = None
-        if providers:
-            provider_list = [p.strip() for p in providers.split(",")]
+    provider_list = None
+    if providers:
+        provider_list = [p.strip() for p in providers.split(",")]
 
-        run_setup(
-            non_interactive=yes,
-            providers=provider_list,
-            model=model,
-        )
-    except ImportError:
-        print_output(
-            "Wizard не установлен. Установите: pip install advisor-cli[wizard]",
-            error=True,
-        )
-        raise typer.Exit(1)
+    run_setup(
+        non_interactive=yes,
+        providers=provider_list,
+        model=model,
+    )
 
 
 @app.command()
@@ -462,27 +457,21 @@ def config_compare(
 
 
 @config_app.command("format")
+@require_wizard
 def config_format(
     fmt: str = typer.Argument(..., help="Формат по умолчанию: markdown|json"),
 ):
     """Установить формат вывода по умолчанию."""
+    from .setup_wizard import load_existing_env, save_env
+
     if fmt.lower() not in ("markdown", "json"):
         print_output("Ошибка: Формат должен быть markdown или json", error=True)
         raise typer.Exit(1)
 
-    try:
-        from .setup_wizard import load_existing_env, save_env
-
-        env = load_existing_env()
-        env["ADVISOR_OUTPUT_FORMAT"] = fmt.lower()
-        save_env(env)
-        print_output(f"Формат по умолчанию: {fmt.lower()}")
-    except ImportError:
-        print_output(
-            "Wizard не установлен. Установите вручную ADVISOR_OUTPUT_FORMAT в .env",
-            error=True,
-        )
-        raise typer.Exit(1)
+    env = load_existing_env()
+    env["ADVISOR_OUTPUT_FORMAT"] = fmt.lower()
+    save_env(env)
+    print_output(f"Формат по умолчанию: {fmt.lower()}")
 
 
 @config_app.command("show")
