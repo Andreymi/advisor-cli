@@ -140,6 +140,18 @@ def mask_api_key(key: str) -> str:
     return key[:4] + "*" * (len(key) - 8) + key[-4:]
 
 
+def update_config(key: str, value: str) -> None:
+    """Обновляет одно значение в конфигурации.
+
+    Args:
+        key: Environment variable name (e.g., "ADVISOR_DEFAULT_MODEL")
+        value: New value
+    """
+    env = load_config()
+    env[key] = value
+    save_config(env)
+
+
 def purge_config() -> bool:
     """Удаляет файл конфигурации (секреты).
 

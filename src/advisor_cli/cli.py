@@ -384,19 +384,10 @@ def config_single(
         except ImportError:
             print_output("Wizard не установлен, пропускаем проверку")
 
-    try:
-        from .setup_wizard import load_existing_env, save_env
+    from .config import update_config
 
-        env = load_existing_env()
-        env["ADVISOR_DEFAULT_MODEL"] = model
-        save_env(env)
-        print_output(f"Модель по умолчанию: {model}")
-    except ImportError:
-        print_output(
-            "Wizard не установлен. Установите вручную ADVISOR_DEFAULT_MODEL в .env",
-            error=True,
-        )
-        raise typer.Exit(1)
+    update_config("ADVISOR_DEFAULT_MODEL", model)
+    print_output(f"Модель по умолчанию: {model}")
 
 
 @config_app.command("compare")
@@ -441,36 +432,24 @@ def config_compare(
         except ImportError:
             print_output("Wizard не установлен, пропускаем проверку")
 
-    try:
-        from .setup_wizard import load_existing_env, save_env
+    from .config import update_config
 
-        env = load_existing_env()
-        env["ADVISOR_DEFAULT_MODELS_COMPARE"] = ",".join(model_list)
-        save_env(env)
-        print_output(f"\nМодели для сравнения: {', '.join(model_list)}")
-    except ImportError:
-        print_output(
-            "Wizard не установлен. Установите вручную ADVISOR_DEFAULT_MODELS_COMPARE в .env",
-            error=True,
-        )
-        raise typer.Exit(1)
+    update_config("ADVISOR_DEFAULT_MODELS_COMPARE", ",".join(model_list))
+    print_output(f"\nМодели для сравнения: {', '.join(model_list)}")
 
 
 @config_app.command("format")
-@require_wizard
 def config_format(
     fmt: str = typer.Argument(..., help="Формат по умолчанию: markdown|json"),
 ):
     """Установить формат вывода по умолчанию."""
-    from .setup_wizard import load_existing_env, save_env
-
     if fmt.lower() not in ("markdown", "json"):
         print_output("Ошибка: Формат должен быть markdown или json", error=True)
         raise typer.Exit(1)
 
-    env = load_existing_env()
-    env["ADVISOR_OUTPUT_FORMAT"] = fmt.lower()
-    save_env(env)
+    from .config import update_config
+
+    update_config("ADVISOR_OUTPUT_FORMAT", fmt.lower())
     print_output(f"Формат по умолчанию: {fmt.lower()}")
 
 
