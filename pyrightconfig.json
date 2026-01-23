@@ -1,0 +1,8 @@
+{
+  "include": ["src"],
+  "exclude": ["**/__pycache__", "**/node_modules", ".venv"],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic"
+}

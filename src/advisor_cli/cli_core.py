@@ -10,6 +10,7 @@ This module provides the main user-facing commands:
 These commands are the primary interface for interacting with LLMs.
 """
 
+import json
 import subprocess
 import sys
 import uuid
@@ -194,7 +195,7 @@ def result(
     if res is None:
         print_output(f"Задача не найдена: {task_id}", error=True)
         raise typer.Exit(1)
-    print_output(res)
+    print_output(json.dumps(res, ensure_ascii=False, indent=2))
 
 
 @core_app.command()

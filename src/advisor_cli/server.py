@@ -12,6 +12,7 @@ import json
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from .core import (
     ConsultExpertInput,
@@ -34,13 +35,13 @@ mcp = FastMCP("advisor_mcp")
 # ===== Tools =====
 @mcp.tool(
     name="advisor_consult_expert",
-    annotations={
-        "title": "Консультация с экспертом",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Консультация с экспертом",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def advisor_consult_expert(params: ConsultExpertInput) -> str:
     """
@@ -112,13 +113,13 @@ async def advisor_consult_expert(params: ConsultExpertInput) -> str:
 
 @mcp.tool(
     name="advisor_compare_experts",
-    annotations={
-        "title": "Сравнение мнений экспертов",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    },
+    annotations=ToolAnnotations(
+        title="Сравнение мнений экспертов",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    ),
 )
 async def advisor_compare_experts(params: CompareExpertsInput) -> str:
     """

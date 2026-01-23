@@ -5,7 +5,7 @@ Core LLM logic for advisor-cli.
 This module contains all LLM-related functionality without MCP dependencies.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from enum import Enum
 import asyncio
 import hashlib
@@ -349,7 +349,7 @@ def extract_reasoning(response) -> Optional[str]:
 
 async def completion_with_auto_detect(
     model: str, messages: list, reasoning: Optional[str], **extra_kwargs
-) -> tuple[any, Optional[str]]:
+) -> tuple[Any, Optional[str]]:
     """
     Perform completion with auto-detection of reasoning support.
     Returns (response, reasoning_content).
