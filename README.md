@@ -1,6 +1,29 @@
 # Advisor CLI
 
-Get second opinions from alternative LLMs (Gemini, GPT, DeepSeek, Ollama).
+[![PyPI](https://img.shields.io/pypi/v/advisor-cli)](https://pypi.org/project/advisor-cli/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Get second opinions from alternative LLMs — Gemini, GPT, DeepSeek, Ollama, and more.
+
+## Why Advisor?
+
+Using Claude but want a second opinion? Advisor lets you:
+
+- **Validate decisions** — ask GPT-4o or Gemini to review suggestions
+- **Compare approaches** — get parallel responses from multiple models
+- **Specialize** — use DeepSeek for reasoning, Groq for speed
+
+Works standalone CLI or integrated directly into Claude Code (MCP + Skill).
+
+## Features
+
+- **Multi-provider** — Gemini, OpenAI, Anthropic, DeepSeek, Groq, Ollama
+- **Claude Code integration** — MCP tools + `/advisor` skill
+- **Compare mode** — parallel queries to multiple models
+- **Async execution** — background tasks for long queries
+- **File input** — pipe stdin or pass files directly
+- **Caching** — disk cache with configurable TTL
 
 ## Quick Start
 
