@@ -28,7 +28,7 @@ from .core import (  # noqa: E402
     consult_expert,
     init_cache,
 )
-from .utils import require_wizard  # noqa: E402
+from .utils import require_wizard, run_async  # noqa: E402
 
 app = typer.Typer(
     name="advisor",

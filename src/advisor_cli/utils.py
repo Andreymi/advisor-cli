@@ -1,12 +1,28 @@
 """Utility functions for advisor-cli."""
 
+import asyncio
 import functools
-from typing import Callable, TypeVar
+from typing import Callable, Coroutine, TypeVar
 
 import typer
 from rich.console import Console
 
 T = TypeVar("T")
+
+
+def run_async(coro: Coroutine[None, None, T]) -> T:
+    """Run async coroutine synchronously.
+
+    Centralized wrapper for asyncio.run() to provide consistent
+    async-to-sync execution across the CLI.
+
+    Args:
+        coro: The coroutine to execute
+
+    Returns:
+        The result of the coroutine
+    """
+    return asyncio.run(coro)
 
 
 def require_wizard(func: Callable[..., T]) -> Callable[..., T]:

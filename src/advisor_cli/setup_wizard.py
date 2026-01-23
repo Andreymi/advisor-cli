@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Интерактивный wizard для настройки mcp-advisor."""
 
-import asyncio
 import os
 
 import questionary
@@ -11,6 +10,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from .config import PROVIDER_INFO, load_config, save_config
+from .utils import run_async
 
 console = Console()
 
@@ -191,7 +191,7 @@ def input_custom_model(enabled_providers: list[str]) -> str | None:
         transient=True,
     ) as progress:
         progress.add_task(description="Проверка модели...", total=None)
-        success, msg = asyncio.run(test_model(model))
+        success, msg = run_async(test_model(model))
 
     if success:
         console.print(f"[green]✓ Модель {model} доступна[/green]")
@@ -424,7 +424,7 @@ def action_add_provider() -> None:
         transient=True,
     ) as progress:
         progress.add_task(description="Проверка подключения...", total=None)
-        success, message = asyncio.run(test_connection(selected, api_key))
+        success, message = run_async(test_connection(selected, api_key))
 
     if success:
         console.print(f"[green]✓ {info['name']} подключён успешно[/green]")
