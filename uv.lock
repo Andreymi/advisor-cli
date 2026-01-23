@@ -8,9 +8,10 @@ resolution-markers = [
 
 [[package]]
 name = "advisor-cli"
-version = "0.1.0"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
+    { name = "diskcache" },
     { name = "litellm" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -19,13 +20,11 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "diskcache" },
     { name = "mcp" },
     { name = "questionary" },
     { name = "rich" },
 ]
 mcp = [
-    { name = "diskcache" },
     { name = "mcp" },
 ]
 wizard = [
@@ -41,7 +40,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "advisor-cli", extras = ["mcp", "wizard"], marker = "extra == 'all'" },
-    { name = "diskcache", marker = "extra == 'mcp'", specifier = ">=5.0.0" },
+    { name = "diskcache", specifier = ">=5.0.0" },
     { name = "litellm", specifier = ">=1.0.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },

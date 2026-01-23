@@ -11,21 +11,20 @@ import asyncio
 import hashlib
 import os
 import json
-from pathlib import Path
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ConfigDict
 from litellm import acompletion
 import litellm
 
-# ===== Константы проекта =====
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-ENV_FILE = PROJECT_ROOT / ".env"
+from .config import CACHE_DIR, CONFIG_FILE
 
-# ===== Загрузка .env =====
-if ENV_FILE.exists():
-    load_dotenv(ENV_FILE)
+# ===== Загрузка конфигурации =====
+# Загружаем из XDG-совместимого пути (~/.config/advisor/config.env)
+if CONFIG_FILE.exists():
+    load_dotenv(CONFIG_FILE)
 else:
+    # Fallback на переменные окружения
     load_dotenv()
 
 # ===== Логирование =====
@@ -49,7 +48,7 @@ PROMPT_VERSION = _hash_prompt(DEFAULT_ROLE)
 # ===== Кэширование =====
 CACHE_ENABLED = os.getenv("ADVISOR_CACHE_ENABLED", "true").lower() == "true"
 CACHE_TTL = int(os.getenv("ADVISOR_CACHE_TTL", "3600"))
-CACHE_DIR = PROJECT_ROOT / ".mcp_cache"
+# CACHE_DIR импортирован из config.py (~/.cache/advisor)
 CACHE_ACTIVE = False
 
 
@@ -180,15 +179,45 @@ def get_completion_kwargs(model: str) -> dict:
 
 
 def format_error(e: Exception) -> str:
-    """Форматирует ошибку с понятным сообщением."""
-    error_msg = str(e)
+    """Форматирует ошибку litellm с понятным сообщением.
+
+    Обрабатывает специфичные случаи, когда litellm возвращает
+    пустые или малоинформативные сообщения об ошибках.
+    """
+    error_type = type(e).__name__
+    error_msg = str(e).strip()
+
+    # AuthenticationError с пустым или неинформативным сообщением
+    if "AuthenticationError" in error_type or "AuthenticationError" in error_msg:
+        if not error_msg or error_msg.endswith(":") or len(error_msg) < 30:
+            return "Ошибка: Неверный API ключ или ключ не имеет доступа к модели"
+
+    # Проверяем конкретные коды/типы ошибок
     if "401" in error_msg or "Unauthorized" in error_msg:
         return "Ошибка: Неверный API ключ. Проверьте переменные окружения."
-    elif "429" in error_msg or "rate limit" in error_msg.lower():
+    if (
+        "429" in error_msg
+        or "rate limit" in error_msg.lower()
+        or "RateLimitError" in error_type
+    ):
         return "Ошибка: Превышен лимит запросов. Подождите и попробуйте снова."
-    elif "timeout" in error_msg.lower():
+    if "timeout" in error_msg.lower() or "Timeout" in error_type:
         return "Ошибка: Таймаут запроса. Попробуйте позже."
-    return f"Ошибка: {error_msg}"
+    if "404" in error_msg or "NotFoundError" in error_type:
+        return "Ошибка: Модель не найдена. Проверьте название."
+    if "APIConnectionError" in error_type or "Connection" in error_msg:
+        return "Ошибка: Не удалось подключиться к API. Проверьте сеть."
+
+    # Очистка сообщения от типичных префиксов litellm
+    for prefix in ["litellm.", "AuthenticationError:", "APIError:"]:
+        if error_msg.startswith(prefix):
+            error_msg = error_msg[len(prefix) :].strip()
+
+    # Обрезаем слишком длинные сообщения
+    if len(error_msg) > 150:
+        error_msg = error_msg[:150] + "..."
+
+    return f"Ошибка: {error_msg}" if error_msg else "Ошибка: Неизвестная ошибка API"
 
 
 # ===== Reasoning =====

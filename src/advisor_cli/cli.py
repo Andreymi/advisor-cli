@@ -515,6 +515,140 @@ def config_format(
         raise typer.Exit(1)
 
 
+@config_app.command("show")
+def config_show():
+    """Показать текущую конфигурацию и расположение файлов."""
+    from .config import CACHE_DIR, CONFIG_FILE, load_config, mask_api_key
+
+    print_output("\n=== Advisor CLI Configuration ===\n")
+    print_output(f"Config file: {CONFIG_FILE}")
+    print_output(f"Cache dir:   {CACHE_DIR}")
+    print_output(f"Config exists: {CONFIG_FILE.exists()}")
+    print_output(f"Cache exists:  {CACHE_DIR.exists()}")
+
+    if not CONFIG_FILE.exists():
+        print_output("\nКонфигурация не найдена. Запустите: advisor setup")
+        return
+
+    env = load_config()
+
+    print_output("\n--- API Keys ---")
+    api_keys = [
+        ("GEMINI_API_KEY", "Gemini"),
+        ("OPENAI_API_KEY", "OpenAI"),
+        ("ANTHROPIC_API_KEY", "Anthropic"),
+        ("DEEPSEEK_API_KEY", "DeepSeek"),
+        ("GROQ_API_KEY", "Groq"),
+        ("OPENROUTER_API_KEY", "OpenRouter"),
+        ("OLLAMA_HOST", "Ollama"),
+        ("OLLAMA_API_KEY", "Ollama Cloud"),
+    ]
+
+    for key, name in api_keys:
+        value = env.get(key, "")
+        if value:
+            print_output(f"  {name}: {mask_api_key(value)}")
+
+    print_output("\n--- Models ---")
+    print_output(f"  Default (ask):     {env.get('ADVISOR_DEFAULT_MODEL', 'not set')}")
+    print_output(
+        f"  Compare (compare): {env.get('ADVISOR_DEFAULT_MODELS_COMPARE', 'not set')}"
+    )
+
+    print_output("\n--- Options ---")
+    cache = env.get("ADVISOR_CACHE_ENABLED", "true")
+    ttl = env.get("ADVISOR_CACHE_TTL", "3600")
+    verbose = env.get("ADVISOR_VERBOSE", "false")
+    print_output(
+        f"  Cache: {'enabled' if cache == 'true' else 'disabled'} (TTL: {ttl}s)"
+    )
+    print_output(f"  Verbose: {'enabled' if verbose == 'true' else 'disabled'}")
+    print_output("")
+
+
+@config_app.command("purge")
+def config_purge(
+    force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
+):
+    """Удалить файл конфигурации (API ключи)."""
+    from .config import CONFIG_FILE, purge_config
+
+    if not CONFIG_FILE.exists():
+        print_output("Конфигурация не найдена.")
+        return
+
+    if not force:
+        print_output(f"Будет удалён: {CONFIG_FILE}")
+        try:
+            import questionary
+
+            confirm = questionary.confirm(
+                "Удалить конфигурацию (API ключи)?",
+                default=False,
+            ).ask()
+            if not confirm:
+                print_output("Отменено.")
+                return
+        except ImportError:
+            print_output("Используйте --force для подтверждения", error=True)
+            raise typer.Exit(1)
+
+    if purge_config():
+        print_output("✓ Конфигурация удалена")
+    else:
+        print_output("Ничего не удалено")
+
+
+@app.command()
+def uninstall(
+    force: bool = typer.Option(False, "--force", "-f", help="Без подтверждения"),
+):
+    """Удалить все данные advisor-cli (конфиг + кэш)."""
+    from .config import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, purge_all
+
+    print_output("\n=== Advisor CLI Uninstall ===\n")
+    print_output("Будут удалены:")
+
+    if CONFIG_FILE.exists():
+        print_output(f"  - {CONFIG_FILE} (API ключи)")
+    if CACHE_DIR.exists():
+        print_output(f"  - {CACHE_DIR}/ (кэш ответов)")
+    if CONFIG_DIR.exists():
+        print_output(f"  - {CONFIG_DIR}/ (директория конфигурации)")
+
+    print_output("\nДля удаления самого пакета выполните:")
+    print_output("  uv tool uninstall advisor-cli")
+    print_output("  # или: pip uninstall advisor-cli")
+
+    if not force:
+        try:
+            import questionary
+
+            confirm = questionary.confirm(
+                "\nУдалить все данные?",
+                default=False,
+            ).ask()
+            if not confirm:
+                print_output("Отменено.")
+                return
+        except ImportError:
+            print_output("\nИспользуйте --force для подтверждения", error=True)
+            raise typer.Exit(1)
+
+    config_removed, cache_removed = purge_all()
+
+    print_output("")
+    if config_removed:
+        print_output("✓ Конфигурация удалена")
+    if cache_removed:
+        print_output("✓ Кэш удалён")
+
+    if not config_removed and not cache_removed:
+        print_output("Нечего удалять.")
+    else:
+        print_output("\nДанные advisor-cli удалены.")
+
+
 @mcp_app.command("install")
 def mcp_install(
     scope: Optional[str] = typer.Option(

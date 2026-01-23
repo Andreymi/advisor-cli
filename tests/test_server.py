@@ -1,18 +1,24 @@
-"""Tests for MCP Advisor server."""
+"""Tests for MCP Advisor core functionality."""
 
 import pytest
 from pydantic import ValidationError
 
-from mcp_advisor.server import (
-    _get_provider,
-    _check_model_allowed,
-    _format_error,
-    _get_enabled_models_hint,
+from advisor_cli.core import (
+    get_provider,
+    check_model_allowed,
+    format_error,
+    get_enabled_models_hint,
     ConsultExpertInput,
     CompareExpertsInput,
     ResponseFormat,
     PROVIDERS,
 )
+
+# Aliases for backwards compatibility with test names
+_get_provider = get_provider
+_check_model_allowed = check_model_allowed
+_format_error = format_error
+_get_enabled_models_hint = get_enabled_models_hint
 
 
 class TestGetProvider:
