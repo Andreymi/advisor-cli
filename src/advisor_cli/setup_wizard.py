@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from .config import load_config, save_config
 
 console = Console()
 
@@ -96,26 +97,6 @@ PROVIDER_INFO = {
 }
 
 
-def load_existing_env() -> dict[str, str]:
-    """Загружает существующие переменные из config.env файла.
-
-    Обёртка над config.load_config() для обратной совместимости.
-    """
-    from .config import load_config
-
-    return load_config()
-
-
-def save_env(env_vars: dict[str, str]) -> None:
-    """Сохраняет переменные в config.env файл.
-
-    Обёртка над config.save_config() для обратной совместимости.
-    """
-    from .config import save_config
-
-    save_config(env_vars)
-
-
 def parse_litellm_error(e: Exception) -> str:
     """Парсит ошибки litellm в понятные сообщения.
 
@@ -191,7 +172,7 @@ async def test_model(model: str) -> tuple[bool, str]:
 
 def get_custom_providers() -> list[str]:
     """Получает список custom провайдеров из .env."""
-    env = load_existing_env()
+    env = load_config()
     custom = env.get("ADVISOR_CUSTOM_PROVIDERS", "")
     return [p.strip() for p in custom.split(",") if p.strip()]
 
@@ -229,9 +210,9 @@ def setup_from_env() -> bool:
     env_vars["ADVISOR_VERBOSE"] = "false"
 
     # Merge with existing
-    existing = load_existing_env()
+    existing = load_config()
     existing.update(env_vars)
-    save_env(existing)
+    save_config(existing)
 
     return True
 
@@ -472,7 +453,7 @@ def configure_options(existing_env: dict[str, str]) -> dict[str, str]:
 
 def action_add_provider() -> None:
     """Добавить нового провайдера."""
-    env = load_existing_env()
+    env = load_config()
     configured = get_configured_providers(env)
 
     # Показываем только ненастроенные провайдеры
@@ -521,7 +502,7 @@ def action_add_provider() -> None:
             for k, v in info["extra_env"].items():
                 env[k] = v
 
-        save_env(env)
+        save_config(env)
     else:
         console.print(f"[red]✗ Ошибка: {message}[/red]")
         retry = questionary.confirm(
@@ -532,13 +513,13 @@ def action_add_provider() -> None:
 
         if retry:
             env[info["env_key"]] = api_key
-            save_env(env)
+            save_config(env)
             console.print(f"[green]✓ {info['name']} добавлен (без проверки)[/green]")
 
 
 def action_remove_provider() -> None:
     """Удалить провайдера."""
-    env = load_existing_env()
+    env = load_config()
     configured = get_configured_providers(env)
 
     if not configured:
@@ -568,13 +549,13 @@ def action_remove_provider() -> None:
 
     if confirm:
         del env[info["env_key"]]
-        save_env(env)
+        save_config(env)
         console.print(f"[green]✓ {info['name']} удалён[/green]")
 
 
 def action_change_model() -> None:
     """Сменить модель по умолчанию (ask)."""
-    env = load_existing_env()
+    env = load_config()
     configured = get_configured_providers(env)
 
     if not configured:
@@ -586,14 +567,14 @@ def action_change_model() -> None:
 
     new_model = select_default_model(configured)
     env["ADVISOR_DEFAULT_MODEL"] = new_model
-    save_env(env)
+    save_config(env)
 
     console.print(f"[green]✓ Модель по умолчанию: {new_model}[/green]")
 
 
 def action_configure_compare() -> None:
     """Настроить модели для консилиума (compare)."""
-    env = load_existing_env()
+    env = load_config()
     configured = get_configured_providers(env)
 
     if not configured:
@@ -606,7 +587,7 @@ def action_configure_compare() -> None:
     default_model = env.get("ADVISOR_DEFAULT_MODEL", "")
     new_models = select_compare_models(configured, default_model, env)
     env["ADVISOR_DEFAULT_MODELS_COMPARE"] = new_models
-    save_env(env)
+    save_config(env)
 
     console.print(f"[green]✓ Модели для сравнения: {new_models}[/green]")
 
@@ -617,7 +598,7 @@ def action_show_settings() -> None:
 
     from .config import CACHE_DIR, CONFIG_FILE, mask_api_key
 
-    env = load_existing_env()
+    env = load_config()
 
     console.print(f"\n[bold]Расположение конфигурации:[/bold] {CONFIG_FILE}")
     console.print(f"[bold]Директория кэша:[/bold] {CACHE_DIR}\n")

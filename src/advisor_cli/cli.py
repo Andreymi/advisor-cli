@@ -613,9 +613,9 @@ def mcp_install(
 
     # Check if providers configured
     try:
-        from .setup_wizard import load_existing_env
+        from .config import load_config
 
-        env = load_existing_env()
+        env = load_config()
     except ImportError:
         env = {}
 
