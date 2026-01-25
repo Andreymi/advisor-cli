@@ -5,7 +5,6 @@ import functools
 from typing import Callable, Coroutine, TypeVar
 
 import typer
-from rich.console import Console
 
 T = TypeVar("T")
 
@@ -44,6 +43,8 @@ def require_wizard(func: Callable[..., T]) -> Callable[..., T]:
         try:
             return func(*args, **kwargs)
         except ImportError:
+            from rich.console import Console  # Lazy import
+
             console = Console()
             console.print("[red]Wizard not installed.[/red]")
             console.print(
