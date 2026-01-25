@@ -1,6 +1,6 @@
 ---
 name: advisor
-description: Get second opinion from alternative LLMs (Gemini, GPT, DeepSeek, etc.). Use for code review, architecture decisions, debugging help, or comparing approaches. Run `advisor models` to see configured providers.
+description: This skill should be used when the user asks to "get second opinion", "consult another LLM", "ask Gemini/GPT/DeepSeek", "compare approaches", "review with external model", or wants alternative perspective on architecture decisions, security review, or debugging. Run `advisor models` to see configured providers.
 user-invocable: true
 context: fork
 agent: general-purpose
