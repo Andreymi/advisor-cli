@@ -271,3 +271,20 @@ PROVIDER_INFO: dict[str, dict[str, Any]] = {
         "base_url_env": "OLLAMA_CLOUD_BASE_URL",
     },
 }
+
+
+def has_configured_providers() -> bool:
+    """Check if any provider has API key configured.
+
+    Uses PROVIDER_INFO as single source of truth for provider env keys.
+    Excludes local-only providers (ollama with OLLAMA_HOST).
+    """
+    env = load_config()
+    for pid, info in PROVIDER_INFO.items():
+        env_key = info.get("env_key")
+        # Skip local ollama (OLLAMA_HOST is optional, not an API key)
+        if pid == "ollama":
+            continue
+        if env_key and env.get(env_key):
+            return True
+    return False

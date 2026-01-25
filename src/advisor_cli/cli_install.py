@@ -25,29 +25,11 @@ def install(
     yes: bool = typer.Option(False, "-y", help="Non-interactive mode"),
 ) -> None:
     """Install MCP integration and Skill for Claude Code."""
-    from .config import Scope, load_config
+    from .config import Scope, has_configured_providers
     from .mcp_manager import has_project_mcp_config, install_to_claude_code
     from .skill_manager import install_skill
 
-    # Check if providers configured
-    try:
-        env = load_config()
-    except ImportError:
-        env = {}
-
-    has_providers = any(
-        env.get(key)
-        for key in [
-            "GEMINI_API_KEY",
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "GROQ_API_KEY",
-            "OPENROUTER_API_KEY",
-        ]
-    )
-
-    if not has_providers:
+    if not has_configured_providers():
         print_output("No configured providers.")
         if yes:
             print_output("Run: advisor setup", error=True)

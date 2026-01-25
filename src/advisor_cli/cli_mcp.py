@@ -31,6 +31,7 @@ def mcp_install(
     yes: bool = typer.Option(False, "-y", help="Неинтерактивный режим"),
 ) -> None:
     """Установить MCP интеграцию для Claude."""
+    from .config import has_configured_providers
     from .mcp_manager import (
         ConflictType,
         Scope,
@@ -41,27 +42,7 @@ def mcp_install(
         install_to_desktop,
     )
 
-    # Check if providers configured
-    try:
-        from .config import load_config
-
-        env = load_config()
-    except ImportError:
-        env = {}
-
-    has_providers = any(
-        env.get(key)
-        for key in [
-            "GEMINI_API_KEY",
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "GROQ_API_KEY",
-            "OPENROUTER_API_KEY",
-        ]
-    )
-
-    if not has_providers:
+    if not has_configured_providers():
         if yes:
             print_output(
                 "Ошибка: Нет настроенных провайдеров. Установите API ключи.", error=True
