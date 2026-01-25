@@ -3,13 +3,9 @@
 
 import shutil
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-
-class Scope(Enum):
-    PROJECT = "project"
-    USER = "user"
+from .config import Scope
 
 
 @dataclass

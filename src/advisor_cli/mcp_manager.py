@@ -8,10 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-
-class Scope(Enum):
-    PROJECT = "project"
-    USER = "user"
+from .config import Scope
 
 
 class Target(Enum):

@@ -25,15 +25,12 @@ def install(
     yes: bool = typer.Option(False, "-y", help="Non-interactive mode"),
 ) -> None:
     """Install MCP integration and Skill for Claude Code."""
-    from .mcp_manager import Scope as McpScope
+    from .config import Scope, load_config
     from .mcp_manager import has_project_mcp_config, install_to_claude_code
-    from .skill_manager import Scope as SkillScope
     from .skill_manager import install_skill
 
     # Check if providers configured
     try:
-        from .config import load_config
-
         env = load_config()
     except ImportError:
         env = {}
@@ -71,16 +68,13 @@ def install(
 
     # Determine scope
     if scope:
-        mcp_scope = McpScope.PROJECT if scope == "project" else McpScope.USER
-        skill_scope = SkillScope.PROJECT if scope == "project" else SkillScope.USER
+        install_scope = Scope.PROJECT if scope == "project" else Scope.USER
     elif has_project_mcp_config():
-        mcp_scope = McpScope.PROJECT
-        skill_scope = SkillScope.PROJECT
+        install_scope = Scope.PROJECT
         if not yes:
             print_output("Found .mcp.json in current project.")
     elif yes:
-        mcp_scope = McpScope.USER
-        skill_scope = SkillScope.USER
+        install_scope = Scope.USER
     else:
         try:
             import questionary
@@ -92,24 +86,22 @@ def install(
                     questionary.Choice("Global (all projects)", value="user"),
                 ],
             ).ask()
-            mcp_scope = McpScope.PROJECT if choice == "project" else McpScope.USER
-            skill_scope = SkillScope.PROJECT if choice == "project" else SkillScope.USER
+            install_scope = Scope.PROJECT if choice == "project" else Scope.USER
         except ImportError:
-            mcp_scope = McpScope.USER
-            skill_scope = SkillScope.USER
+            install_scope = Scope.USER
 
-    loc = "project" if mcp_scope == McpScope.PROJECT else "user"
+    loc = "project" if install_scope == Scope.PROJECT else "user"
     print_output(f"\nInstalling to {loc}...\n")
 
     # Install MCP
-    if install_to_claude_code(mcp_scope):
-        mcp_path = ".mcp.json" if mcp_scope == McpScope.PROJECT else "~/.claude.json"
+    if install_to_claude_code(install_scope):
+        mcp_path = ".mcp.json" if install_scope == Scope.PROJECT else "~/.claude.json"
         print_output(f"MCP installed: {mcp_path}")
     else:
         print_output("MCP not installed", error=True)
 
     # Install Skill
-    success, message = install_skill(scope=skill_scope, force=force)
+    success, message = install_skill(scope=install_scope, force=force)
     if success:
         print_output(f"Skill installed: {message}")
     else:

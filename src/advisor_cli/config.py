@@ -8,8 +8,17 @@ Follows XDG Base Directory Specification:
 
 import os
 import shutil
+from enum import Enum
 from pathlib import Path
 from typing import Any
+
+
+class Scope(Enum):
+    """Installation scope for MCP and skills."""
+
+    PROJECT = "project"
+    USER = "user"
+
 
 # ===== XDG-совместимые пути =====
 
