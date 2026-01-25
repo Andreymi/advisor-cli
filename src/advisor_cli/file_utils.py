@@ -72,11 +72,6 @@ def read_context_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def get_allowed_extensions_str() -> str:
-    """Возвращает строку с поддерживаемыми расширениями."""
-    return ", ".join(sorted(ALLOWED_EXTENSIONS))
-
-
 def read_stdin() -> str | None:
     """Читает stdin если есть данные.
 

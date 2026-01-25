@@ -30,17 +30,6 @@ WIZARD_STYLE = Style(
 )
 
 
-def parse_litellm_error(e: Exception) -> str:
-    """Парсит ошибки litellm в понятные сообщения.
-
-    Deprecated: используйте core.format_error() напрямую.
-    Эта функция сохранена для обратной совместимости.
-    """
-    from .core import format_error
-
-    return format_error(e, include_prefix=False)
-
-
 async def test_connection(provider: str, api_key: str) -> tuple[bool, str]:
     """Тестирует подключение к провайдеру."""
     from litellm import acompletion
@@ -74,7 +63,9 @@ async def test_connection(provider: str, api_key: str) -> tuple[bool, str]:
         await acompletion(messages=[{"role": "user", "content": "Hi"}], **kwargs)
         return True, "OK"
     except Exception as e:  # LiteLLM can raise various provider-specific exceptions
-        return False, parse_litellm_error(e)
+        from .core import format_error
+
+        return False, format_error(e, include_prefix=False)
 
 
 async def test_model(model: str) -> tuple[bool, str]:
@@ -100,7 +91,9 @@ async def test_model(model: str) -> tuple[bool, str]:
         await acompletion(messages=[{"role": "user", "content": "Hi"}], **kwargs)
         return True, "OK"
     except Exception as e:  # LiteLLM can raise various provider-specific exceptions
-        return False, parse_litellm_error(e)
+        from .core import format_error
+
+        return False, format_error(e, include_prefix=False)
 
 
 def get_custom_providers() -> list[str]:

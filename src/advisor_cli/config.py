@@ -262,21 +262,3 @@ PROVIDER_INFO: dict[str, dict[str, Any]] = {
         "base_url_env": "OLLAMA_CLOUD_BASE_URL",
     },
 }
-
-
-def get_provider_env_key(provider_id: str) -> str | None:
-    """Get environment variable key for provider."""
-    info = PROVIDER_INFO.get(provider_id)
-    return info["env_key"] if info else None
-
-
-def get_enabled_providers() -> list[str]:
-    """Get list of providers with configured API keys."""
-    enabled = []
-    for pid, info in PROVIDER_INFO.items():
-        env_key = info.get("env_key")
-        if env_key is None:
-            enabled.append(pid)
-        elif os.getenv(env_key):
-            enabled.append(pid)
-    return enabled
