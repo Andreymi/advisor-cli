@@ -62,8 +62,20 @@ def get_advisor_path() -> str:
     return path or "advisor"
 
 
-def get_advisor_config_for_claude_code() -> dict:
-    """Get MCP config for Claude Code (uses PATH)."""
+def get_advisor_config_for_claude_code(dev_dir: Optional[str] = None) -> dict:
+    """Get MCP config for Claude Code.
+
+    Args:
+        dev_dir: If provided, use 'uv run --directory' for dev mode.
+                 Otherwise use 'advisor' from PATH.
+    """
+    if dev_dir:
+        return {
+            "advisor_mcp": {
+                "command": "uv",
+                "args": ["run", "--directory", dev_dir, "advisor", "run"],
+            }
+        }
     return {"advisor_mcp": {"command": "advisor", "args": ["run"]}}
 
 
@@ -115,6 +127,26 @@ def remove_mcp_server(config: dict, name: str) -> dict:
     if "mcpServers" in config and name in config["mcpServers"]:
         del config["mcpServers"][name]
     return config
+
+
+def is_dev_config(server_config: dict) -> Optional[str]:
+    """Check if config uses dev mode (uv run --directory).
+
+    Returns:
+        The dev directory path if dev mode, None otherwise.
+    """
+    cmd = server_config.get("command", "")
+    args = server_config.get("args", [])
+
+    # Dev mode: command is "uv" with "--directory" in args
+    if cmd == "uv" and "--directory" in args:
+        try:
+            dir_idx = args.index("--directory")
+            if dir_idx + 1 < len(args):
+                return args[dir_idx + 1]
+        except (ValueError, IndexError):
+            pass
+    return None
 
 
 def is_advisor_config(server_config: dict) -> bool:
@@ -224,8 +256,13 @@ def check_conflicts(scope: Scope, target: Target) -> list[Conflict]:
     return conflicts
 
 
-def install_to_claude_code(scope: Scope) -> bool:
-    """Install advisor_mcp to Claude Code config."""
+def install_to_claude_code(scope: Scope, dev_dir: Optional[str] = None) -> bool:
+    """Install advisor_mcp to Claude Code config.
+
+    Args:
+        scope: PROJECT or USER scope.
+        dev_dir: If provided, configure for dev mode with 'uv run --directory'.
+    """
     paths = get_config_paths()
 
     if scope == Scope.PROJECT:
@@ -234,7 +271,7 @@ def install_to_claude_code(scope: Scope) -> bool:
         path = paths["claude_code_user"]
 
     config = read_config(path)
-    advisor_config = get_advisor_config_for_claude_code()
+    advisor_config = get_advisor_config_for_claude_code(dev_dir=dev_dir)
     config = set_mcp_server(config, "advisor_mcp", advisor_config["advisor_mcp"])
     write_config(path, config)
     return True
@@ -302,10 +339,12 @@ def get_installation_status() -> dict[str, dict]:
     config = read_config(paths["claude_code_user"])
     servers = get_mcp_servers(config)
     if "advisor_mcp" in servers:
+        server_config = servers["advisor_mcp"]
         status["claude_code_user"] = {
             "installed": True,
-            "outdated": is_outdated_config(servers["advisor_mcp"]),
-            "config": servers["advisor_mcp"],
+            "outdated": is_outdated_config(server_config),
+            "dev_dir": is_dev_config(server_config),
+            "config": server_config,
         }
     else:
         status["claude_code_user"] = {"installed": False}
@@ -314,10 +353,12 @@ def get_installation_status() -> dict[str, dict]:
     config = read_config(paths["claude_code_project"])
     servers = get_mcp_servers(config)
     if "advisor_mcp" in servers:
+        server_config = servers["advisor_mcp"]
         status["claude_code_project"] = {
             "installed": True,
-            "outdated": is_outdated_config(servers["advisor_mcp"]),
-            "config": servers["advisor_mcp"],
+            "outdated": is_outdated_config(server_config),
+            "dev_dir": is_dev_config(server_config),
+            "config": server_config,
         }
     else:
         status["claude_code_project"] = {"installed": False}
@@ -328,10 +369,12 @@ def get_installation_status() -> dict[str, dict]:
         config = read_config(desktop_path)
         servers = get_mcp_servers(config)
         if "advisor_mcp" in servers:
+            server_config = servers["advisor_mcp"]
             status["claude_desktop"] = {
                 "installed": True,
-                "outdated": is_outdated_config(servers["advisor_mcp"]),
-                "config": servers["advisor_mcp"],
+                "outdated": is_outdated_config(server_config),
+                "dev_dir": is_dev_config(server_config),
+                "config": server_config,
             }
         else:
             status["claude_desktop"] = {"installed": False}

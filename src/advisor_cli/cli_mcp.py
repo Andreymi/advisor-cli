@@ -8,6 +8,7 @@ This module provides MCP (Model Context Protocol) management commands:
 These commands manage the advisor MCP server configuration.
 """
 
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -29,6 +30,12 @@ def mcp_install(
         False, "--force", "-f", help="Перезаписать без вопросов"
     ),
     yes: bool = typer.Option(False, "-y", help="Неинтерактивный режим"),
+    dev: bool = typer.Option(
+        False,
+        "--dev",
+        "-d",
+        help="Dev режим: использовать uv run из текущей директории",
+    ),
 ) -> None:
     """Установить MCP интеграцию для Claude."""
     from .config import has_configured_providers
@@ -128,10 +135,22 @@ def mcp_install(
 
     # Install
     installed = []
+    dev_dir = str(Path.cwd()) if dev else None
+
+    # Check uv availability for dev mode
+    if dev:
+        import shutil
+
+        if not shutil.which("uv"):
+            print_output(
+                "⚠ Warning: 'uv' не найден в PATH. Dev режим может не работать."
+            )
 
     if target_enum in (Target.ALL, Target.CLAUDE_CODE):
-        if install_to_claude_code(scope_enum):
+        if install_to_claude_code(scope_enum, dev_dir=dev_dir):
             loc = ".mcp.json" if scope_enum == Scope.PROJECT else "~/.claude.json"
+            if dev:
+                loc += " (dev mode)"
             installed.append(loc)
 
     if target_enum in (Target.ALL, Target.DESKTOP):
@@ -256,6 +275,8 @@ def mcp_status() -> None:
             any_installed = True
             if info.get("outdated"):
                 print_output(f"  {label}: ⚠ установлен (устаревшая версия)")
+            elif info.get("dev_dir"):
+                print_output(f"  {label}: ✓ установлен (dev: {info['dev_dir']})")
             else:
                 print_output(f"  {label}: ✓ установлен")
         else:
